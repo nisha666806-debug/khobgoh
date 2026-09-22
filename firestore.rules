@@ -1,45 +1,208 @@
 rules_version = '2';
+
 service cloud.firestore {
+
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
+
+    // =========================================================
+    // AUTH HELPERS
+    // =========================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      );
+    }
+
     function manager() {
-      return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "manager";
+      return signedIn()
+        && userDoc().data.role == "manager";
     }
+
     function supervisor() {
-      return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "supervisor";
+      return signedIn()
+        && userDoc().data.role == "supervisor";
     }
+
+
+    // =========================================================
+    // USERS
+    // =========================================================
+
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || manager());
+
+      // User can read own profile.
+      // Manager can read all users.
+      allow read: if signedIn()
+        && (request.auth.uid == uid || manager());
+
+      // Only manager can create/update/delete users.
       allow create, update, delete: if manager();
     }
-    match /students/{id} {
-      allow read: if manager() || supervisor();
-      allow write: if manager();
+
+
+    // =========================================================
+    // STUDENTS
+    // =========================================================
+
+    match /students/{studentId} {
+
+      // Manager sees all students.
+      // Supervisor sees only students assigned to him.
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      // Only manager can create/update/delete students.
+      allow create, update, delete: if manager();
     }
-    match /rooms/{id} {
-      allow read: if manager() || supervisor();
-      allow write: if manager();
+
+
+    // =========================================================
+    // ROOMS
+    // =========================================================
+
+    match /rooms/{roomId} {
+
+      // Manager sees all rooms.
+      // Supervisor sees only his assigned rooms.
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      // Only manager can create/update/delete rooms.
+      allow create, update, delete: if manager();
     }
-    match /placements/{id} {
-      allow read: if manager() || supervisor();
-      allow write: if manager() || supervisor();
+
+
+    // =========================================================
+    // PLACEMENTS
+    // =========================================================
+
+    match /placements/{placementId} {
+
+      // Manager can see everything.
+      // Supervisor can see placements belonging to his rooms.
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      // Manager can always modify.
+      // Supervisor can modify only his own placements.
+      allow create, update: if manager()
+        || (
+          supervisor()
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      allow delete: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
     }
-    match /attendance/{id} {
-      allow read: if manager() || supervisor();
-      allow create, update: if manager() || supervisor();
+
+
+    // =========================================================
+    // ATTENDANCE
+    // =========================================================
+
+    match /attendance/{attendanceId} {
+
+      // Manager sees all.
+      // Supervisor sees only his own records.
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      // Manager or supervisor can create.
+      allow create: if manager()
+        || (
+          supervisor()
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      // Manager can update everything.
+      // Supervisor can update only his own records.
+      allow update: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      // Only manager can delete.
       allow delete: if manager();
     }
-    match /violations/{id} {
-      allow read: if manager() || supervisor();
-      allow create: if manager() || supervisor();
-      allow update, delete: if manager();
+
+
+    // =========================================================
+    // VIOLATIONS
+    // =========================================================
+
+    match /violations/{violationId} {
+
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      allow create: if manager()
+        || (
+          supervisor()
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      allow update: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      allow delete: if manager();
     }
-    match /cleanliness_inspections/{id} {
-      allow read: if manager() || supervisor();
-      allow create: if manager() || supervisor();
-      allow update, delete: if manager();
+
+
+    // =========================================================
+    // CLEANLINESS
+    // =========================================================
+
+    match /cleanliness_inspections/{inspectionId} {
+
+      allow read: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+        );
+
+      allow create: if manager()
+        || (
+          supervisor()
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      allow update: if manager()
+        || (
+          supervisor()
+          && resource.data.supervisorId == request.auth.uid
+          && request.resource.data.supervisorId == request.auth.uid
+        );
+
+      allow delete: if manager();
     }
   }
 }
