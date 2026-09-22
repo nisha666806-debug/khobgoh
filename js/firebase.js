@@ -35,11 +35,14 @@ const firebaseConfig = {
   projectId: "khobgoh-23dcc",
   storageBucket: "khobgoh-23dcc.firebasestorage.app",
   messagingSenderId: "154064833176",
-  appId: "1:154064833176:web:a4f2a002a2783ecd5fdeed"
+  appId: "1:154064833176:web:a4a2f002a2783ecd5fdeed"
 };
 
 
-// Main application
+// ===============================
+// MAIN FIREBASE APP
+// ===============================
+
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
@@ -47,50 +50,70 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 
-// ---------------------------------------------------------
-// Secondary Firebase App
-// Used for supervisor registration.
-//
-// This prevents creating a supervisor account
-// from logging the Manager out.
-// ---------------------------------------------------------
+// ===============================
+// SECONDARY APP
+// Барои бақайдгирии мураббӣ
+// бе баромадани Manager
+// ===============================
 
 const secondaryApp = initializeApp(
   firebaseConfig,
   "SupervisorRegistrationApp"
 );
 
-const registrationAuth = getAuth(
-  secondaryApp
-);
+const registrationAuth = getAuth(secondaryApp);
 
+const registrationDb = getFirestore(secondaryApp);
+
+
+// ===============================
+// EXPORTS
+// ===============================
 
 export {
   app,
+
   auth,
+
   db,
 
   registrationAuth,
 
+  registrationDb,
+
   onAuthStateChanged,
+
   signInWithEmailAndPassword,
+
   signOut,
+
   createUserWithEmailAndPassword,
 
   collection,
+
   doc,
+
   getDoc,
+
   getDocs,
+
   setDoc,
+
   addDoc,
+
   updateDoc,
+
   deleteDoc,
 
   query,
+
   where,
+
   orderBy,
+
   limit,
 
   serverTimestamp,
+
   runTransaction
 };
