@@ -4,15 +4,11 @@ service cloud.firestore {
 
   match /databases/{database}/documents {
 
-    // =========================================================
-    // AUTH HELPERS
-    // =========================================================
-
     function signedIn() {
       return request.auth != null;
     }
 
-    function userDoc() {
+    function myUser() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
       );
@@ -20,85 +16,108 @@ service cloud.firestore {
 
     function manager() {
       return signedIn()
-        && userDoc().data.role == "manager";
+        && myUser().data.role == "manager";
     }
 
     function supervisor() {
       return signedIn()
-        && userDoc().data.role == "supervisor";
+        && myUser().data.role == "supervisor";
     }
 
 
-    // =========================================================
+    // =====================================================
     // USERS
-    // =========================================================
+    // =====================================================
 
     match /users/{uid} {
 
-      // User can read own profile.
-      // Manager can read all users.
       allow read: if signedIn()
-        && (request.auth.uid == uid || manager());
+        && (
+          request.auth.uid == uid
+          || manager()
+        );
 
-      // Only manager can create/update/delete users.
-      allow create, update, delete: if manager();
+      // Manager can manage users.
+      //
+      // A new supervisor can create ONLY his own profile
+      // AND only when a valid invitation exists.
+      allow create: if manager()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.role == "supervisor"
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.inviteCode is string
+          && get(
+            /databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)
+          ).data.email == request.auth.token.email
+          && get(
+            /databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)
+          ).data.status == "pending"
+        );
+
+      allow update, delete: if manager();
     }
 
 
-    // =========================================================
+    // =====================================================
+    // INVITATIONS
+    // =====================================================
+
+    match /invitations/{inviteId} {
+
+      // Only Manager creates/changes/deletes invitations.
+      allow create, update, delete: if manager();
+
+      // Nobody directly reads invitation documents.
+      allow read: if false;
+    }
+
+
+    // =====================================================
     // STUDENTS
-    // =========================================================
+    // =====================================================
 
     match /students/{studentId} {
 
-      // Manager sees all students.
-      // Supervisor sees only students assigned to him.
       allow read: if manager()
         || (
           supervisor()
           && resource.data.supervisorId == request.auth.uid
         );
 
-      // Only manager can create/update/delete students.
       allow create, update, delete: if manager();
     }
 
 
-    // =========================================================
+    // =====================================================
     // ROOMS
-    // =========================================================
+    // =====================================================
 
     match /rooms/{roomId} {
 
-      // Manager sees all rooms.
-      // Supervisor sees only his assigned rooms.
       allow read: if manager()
         || (
           supervisor()
           && resource.data.supervisorId == request.auth.uid
         );
 
-      // Only manager can create/update/delete rooms.
       allow create, update, delete: if manager();
     }
 
 
-    // =========================================================
+    // =====================================================
     // PLACEMENTS
-    // =========================================================
+    // =====================================================
 
     match /placements/{placementId} {
 
-      // Manager can see everything.
-      // Supervisor can see placements belonging to his rooms.
       allow read: if manager()
         || (
           supervisor()
           && resource.data.supervisorId == request.auth.uid
         );
 
-      // Manager can always modify.
-      // Supervisor can modify only his own placements.
       allow create, update: if manager()
         || (
           supervisor()
@@ -113,29 +132,24 @@ service cloud.firestore {
     }
 
 
-    // =========================================================
+    // =====================================================
     // ATTENDANCE
-    // =========================================================
+    // =====================================================
 
     match /attendance/{attendanceId} {
 
-      // Manager sees all.
-      // Supervisor sees only his own records.
       allow read: if manager()
         || (
           supervisor()
           && resource.data.supervisorId == request.auth.uid
         );
 
-      // Manager or supervisor can create.
       allow create: if manager()
         || (
           supervisor()
           && request.resource.data.supervisorId == request.auth.uid
         );
 
-      // Manager can update everything.
-      // Supervisor can update only his own records.
       allow update: if manager()
         || (
           supervisor()
@@ -143,14 +157,13 @@ service cloud.firestore {
           && request.resource.data.supervisorId == request.auth.uid
         );
 
-      // Only manager can delete.
       allow delete: if manager();
     }
 
 
-    // =========================================================
+    // =====================================================
     // VIOLATIONS
-    // =========================================================
+    // =====================================================
 
     match /violations/{violationId} {
 
@@ -177,9 +190,9 @@ service cloud.firestore {
     }
 
 
-    // =========================================================
+    // =====================================================
     // CLEANLINESS
-    // =========================================================
+    // =====================================================
 
     match /cleanliness_inspections/{inspectionId} {
 
