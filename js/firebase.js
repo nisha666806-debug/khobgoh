@@ -1,10 +1,13 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 
 import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 
 import {
@@ -36,6 +39,7 @@ const firebaseConfig = {
 };
 
 
+// Main application
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
@@ -43,14 +47,35 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 
+// ---------------------------------------------------------
+// Secondary Firebase App
+// Used for supervisor registration.
+//
+// This prevents creating a supervisor account
+// from logging the Manager out.
+// ---------------------------------------------------------
+
+const secondaryApp = initializeApp(
+  firebaseConfig,
+  "SupervisorRegistrationApp"
+);
+
+const registrationAuth = getAuth(
+  secondaryApp
+);
+
+
 export {
   app,
   auth,
   db,
 
+  registrationAuth,
+
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
+  createUserWithEmailAndPassword,
 
   collection,
   doc,
