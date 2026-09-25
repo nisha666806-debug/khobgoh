@@ -1,4 +1,4 @@
-const CACHE = "khobgoh-v1";
+const CACHE = "khobgoh-v4-residence-permissions";
 const SHELL = [
   "./",
   "./index.html",
