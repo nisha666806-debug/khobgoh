@@ -1,5 +1,5 @@
 import{auth,db,registrationAuth,registrationDb,onAuthStateChanged,signInWithEmailAndPassword,signOut,createUserWithEmailAndPassword,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,serverTimestamp,runTransaction,writeBatch}from"./firebase.js";
-
+ 
 const state={page:"dashboard",user:null,profile:null,students:[],rooms:[],supervisors:[],placements:[],attendance:[],violations:[],cleanliness:[]};
 const $=id=>document.getElementById(id),uid=()=>auth.currentUser?.uid||"",isManager=()=>state.profile?.role==="manager";
 const esc=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
@@ -13,7 +13,7 @@ function inviteCode(){const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let x="KHG-";fo
 function date(v){if(!v)return"—";const d=v?.toDate?v.toDate():new Date(v);return isNaN(d)?"—":d.toLocaleDateString("tg-TJ")}
 function status(s){return({Active:"Фаъол","Temporarily absent":"Ғоиб",Transferred:"Гузаронида шуд",Removed:"Хориҷшуда"})[s]||s||"—"}
 function att(s){return({present:"Ҳозир",absent:"Ғоиб",permission:"Иҷозат",sick:"Бемор"})[s]||s||"—"}
-
+ 
 /* ---------- toast notifications (replaces alert()) ---------- */
 function toast(msg,type="info"){
   let wrap=$("toastWrap");
@@ -23,10 +23,10 @@ function toast(msg,type="info"){
   setTimeout(()=>{t.classList.remove("show");setTimeout(()=>t.remove(),250)},3600);
 }
 const ok=m=>toast(m,"ok"),err=m=>toast(m,"err");
-
+ 
 /* ---------- loading indicator ---------- */
 function setLoading(v){document.body.classList.toggle("is-loading",v)}
-
+ 
 /* ---------- login / registration ---------- */
 function renderLogin(){document.body.innerHTML=`<div class="login-page"><div class="login-card"><div class="login-logo"><img src="assets/dormitory-logo.png"></div><h1>Dormitory</h1><p class="login-subtitle">Системаи идоракунии хобгоҳ</p><div class="form-group"><label>Email</label><input id="loginEmail" type="email"></div><div class="form-group"><label>Парол</label><input id="loginPassword" type="password"></div><button class="btn btn-primary" onclick="login()">Ворид шудан</button><div class="register-link">Мураббӣ ҳастед? <button onclick="renderSupervisorRegistration()">Бақайдгирӣ</button></div></div></div>`}
 async function login(){const e=$("loginEmail")?.value.trim(),p=$("loginPassword")?.value;if(!e||!p)return err("Email ва паролро ворид кунед.");try{await signInWithEmailAndPassword(auth,e,p)}catch(e){console.error(e);err("Email ё парол нодуруст аст.")}}
@@ -41,7 +41,7 @@ async function registerSupervisor(){
  await signOut(registrationAuth);ok("Бақайдгирӣ бомуваффақият анҷом ёфт.");renderLogin();
  }catch(e){console.error(e);err("Хатогӣ: "+e.message)}
 }
-
+ 
 /* ---------- shell ---------- */
 function shell(){document.body.innerHTML=`<div id="app"><aside class="sidebar"><div class="brand"><div class="logo brand-icon"><img src="assets/dormitory-logo.png"></div><div><b>Dormitory</b><small>Management System</small></div></div><nav id="nav"><button data-page="dashboard">📊 Dashboard</button><button data-page="students">👨‍🎓 Донишҷӯён</button><button data-page="rooms">🛏️ Ҳуҷраҳо</button><button data-page="attendance">📋 Давомот</button><button data-page="violations">⚠️ Қоидавайронкунӣ</button><button data-page="cleanliness">🏆 Озмуни тозагӣ</button><button data-page="supervisors">👥 Мураббиён</button></nav><div class="sidebar-bottom"><span>${isManager()?"Manager":"Supervisor"}</span><button id="logout">Баромадан</button></div></aside><main class="main"><div id="loadingBar" class="loading-bar"></div><header><button id="menu">☰</button><div><h1 id="title">Dashboard</h1><p id="subtitle">Идоракунии хобгоҳ</p></div><div class="user">👤 ${esc(state.profile?.name||state.profile?.email)}</div></header><section id="content"></section></main></div><div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><div id="modalContent"></div></div></div>`;$("logout").onclick=logout;$("closeModal").onclick=closeModal;$("nav").onclick=e=>{const b=e.target.closest("[data-page]");if(b){state.page=b.dataset.page;renderPage()}};$("menu").onclick=()=>document.querySelector(".sidebar")?.classList.toggle("open")}
 async function seedRooms(){if(!isManager())return;const s=await getDocs(collection(db,"rooms"));if(!s.empty)return;for(let i=1;i<=10;i++){const id=`room${String(i).padStart(2,"0")}`;await setDoc(doc(db,"rooms",id),{id,number:i,name:`Ҳуҷра №${i}`,type:i<=7?"student":"supervisor",capacity:i<=7?8:4,supervisorId:null,createdAt:serverTimestamp()})}}
@@ -58,7 +58,7 @@ async function loadData(){
   q=isManager()?collection(db,"cleanliness_inspections"):query(collection(db,"cleanliness_inspections"),where("supervisorId","==",uid()));state.cleanliness=(await getDocs(q)).docs.map(d=>({id:d.id,...d.data()}));
  }finally{setLoading(false)}
 }
-
+ 
 /* ---------- dashboard (with 6-month trend chart) ---------- */
 let trendChart=null;
 const MONTHS_TG=["Янв","Фев","Март","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
@@ -79,7 +79,7 @@ function renderTrendChart(){
   {label:"Қоидавайронкунӣ",data:violations,borderColor:"#0b5d3b",backgroundColor:"rgba(11,93,59,.12)",tension:.3,fill:true}
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{family:"Manrope"}}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
-
+ 
 /* ---------- students ---------- */
 function studentsPage(){$("content").innerHTML=`<div class="page-head"><div><h2>Донишҷӯён</h2><p>Рӯйхати донишҷӯён</p></div>${isManager()?'<button class="btn btn-primary" onclick="openAddStudent()">+ Донишҷӯи нав</button>':""}</div><div class="toolbar"><input placeholder="Ҷустуҷӯ..." oninput="renderStudentRows(this.value)"></div><div class="table-wrap"><table><thead><tr><th>Ном</th><th>Синф</th><th>Телефон</th><th>Ҳуҷра</th><th>Ҷой</th><th>Мураббӣ</th><th>Ҳолат</th></tr></thead><tbody id="studentRows"></tbody></table></div>`;renderStudentRows("")}
 function renderStudentRows(x){x=String(x||"").toLowerCase();const a=state.students.filter(s=>!x||`${s.name} ${s.className||""} ${s.phone||""}`.toLowerCase().includes(x));$("studentRows").innerHTML=a.map(s=>`<tr><td><button class="link-btn" onclick="openStudent('${s.id}')">${esc(s.name)}</button></td><td>${esc(s.className||"—")}</td><td>${esc(s.phone||"—")}</td><td>${esc(roomName(s.roomId))}</td><td>${s.place||"—"}</td><td>${esc(supervisorName(s.supervisorId))}</td><td>${status(s.status)}</td></tr>`).join("")||`<tr><td colspan="7">Донишҷӯ ёфт нашуд.</td></tr>`}
@@ -95,14 +95,14 @@ async function deleteStudent(id){if(!confirm("Донишҷӯ пурра нест
 function openTransferStudent(sid){const s=state.students.find(x=>x.id===sid);if(!s)return;const rooms=state.rooms.filter(r=>r.type==="student"&&r.id!==s.roomId);modal(`<h2>Гузарондани ${esc(s.name)}</h2><div class="form-group"><label>Ҳуҷраи нав</label><select id="transferRoom">${rooms.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><input id="transferPlace" type="number" min="1"></div><div class="form-group"><label>Мураббӣ</label><select id="transferSupervisor">${state.supervisors.map(x=>`<option value="${x.id}">${esc(x.name||x.email)}</option>`).join("")}</select></div><button class="btn btn-primary" onclick="confirmTransfer('${sid}')">Гузарондан</button>`)}
 async function confirmTransfer(sid){const rid=$("transferRoom").value,p=Number($("transferPlace").value),sp=$("transferSupervisor").value;if(!rid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),pr=doc(collection(db,"placements"));const rs=await t.get(rr);if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(state.students.some(s=>s.id!==sid&&s.roomId===rid&&Number(s.place)===p))throw Error("Ҷой аллакай ишғол шудааст.");t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",updatedAt:serverTimestamp()});t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"transferred",createdAt:serverTimestamp()})});closeModal();ok("Донишҷӯ гузаронида шуд.");await loadData();renderPage()}catch(e){err(e.message)}}
 async function removeFromRoom(sid){if(!confirm("Донишҷӯ аз ҳуҷра хориҷ карда шавад?"))return;await updateDoc(doc(db,"students",sid),{roomId:null,place:null,supervisorId:null,updatedAt:serverTimestamp()});await addDoc(collection(db,"placements"),{studentId:sid,roomId:null,action:"removed",createdAt:serverTimestamp()});closeModal();ok("Донишҷӯ аз ҳуҷра хориҷ шуд.");await loadData();renderPage()}
-
+ 
 /* ---------- rooms ---------- */
 function roomsPage(){$("content").innerHTML=`<div class="page-head"><div><h2>Ҳуҷраҳо</h2><p>Ҷойҳои хоб</p></div></div><div class="toolbar"><input placeholder="Ҷустуҷӯ аз рӯи ном ё мураббӣ..." oninput="renderRoomCards(this.value)"></div><div id="roomCards"></div>`;renderRoomCards("")}
 function renderRoomCards(x){x=String(x||"").toLowerCase();const list=state.rooms.filter(r=>!x||`${r.name} ${supervisorName(r.supervisorId)}`.toLowerCase().includes(x)).sort((a,b)=>(a.number||0)-(b.number||0));$("roomCards").innerHTML=`<div class="room-grid large">${list.map(r=>{const n=state.students.filter(s=>s.roomId===r.id&&s.status==="Active").length;return`<div class="room-card" onclick="openRoom('${r.id}')"><h3>🛏️ ${esc(r.name)}</h3><strong>${n}/${cap(r)}</strong><p>${cap(r)-n} ҷой холӣ</p><small>${esc(supervisorName(r.supervisorId))}</small></div>`}).join("")||'<p>Ҳуҷра ёфт нашуд.</p>'}</div>`}
 function openRoom(id){const r=state.rooms.find(x=>x.id===id);if(!r)return;const ss=state.students.filter(s=>s.roomId===id),n=cap(r);let b="";for(let i=1;i<=n;i++){const s=ss.find(x=>Number(x.place)===i);b+=`<div class="bed ${s?"occupied":"free"}" ${s?`onclick="openStudent('${s.id}')"`:""}><span>${i}</span>${s?`<strong>${esc(s.name)}</strong>`:"<small>Ҷой холӣ</small>"}</div>`}modal(`<h2>${esc(r.name)}</h2><p>Иқтидор: ${n} | Ишғолшуда: ${ss.length} | Холӣ: ${n-ss.length}</p><p>Мураббӣ: ${esc(supervisorName(r.supervisorId))}</p><div class="beds-grid">${b}</div>${isManager()?`<button class="btn btn-primary" onclick="openAssignStudent('${id}')">+ Ҷойгиркунӣ</button>`:""}`)}
 function openAssignStudent(rid){const r=state.rooms.find(x=>x.id===rid);const free=state.students.filter(s=>s.status==="Active"&&!s.roomId),places=Array.from({length:cap(r)},(_,i)=>i+1).filter(p=>!state.students.some(s=>s.roomId===rid&&Number(s.place)===p));modal(`<h2>Ҷойгиркунӣ</h2><div class="form-group"><label>Донишҷӯ</label><select id="assignStudent">${free.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><select id="assignPlace">${places.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div><div class="form-group"><label>Мураббӣ</label><select id="assignSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select></div><button class="btn btn-primary" onclick="assignStudent('${rid}')">Тасдиқ</button>`)}
 async function assignStudent(rid){const sid=$("assignStudent").value,p=Number($("assignPlace").value),sp=$("assignSupervisor").value;if(!sid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),pr=doc(collection(db,"placements"));const rs=await t.get(rr);if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(state.students.some(s=>s.id!==sid&&s.roomId===rid&&Number(s.place)===p))throw Error("Ҷой аллакай ишғол шудааст.");t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",updatedAt:serverTimestamp()});t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"assigned",createdAt:serverTimestamp()})});closeModal();ok("Донишҷӯ ҷойгир карда шуд.");await loadData();renderPage()}catch(e){err(e.message)}}
-
+ 
 /* ---------- attendance ---------- */
 function attendancePage(){$("content").innerHTML=`<div class="page-head"><div><h2>Давомот</h2></div><div class="action-row"><button class="btn btn-secondary" onclick="openBulkAttendance()">Сабти дастаҷамъӣ</button><button class="btn btn-primary" onclick="openAttendance()">+ Сабт</button></div></div><div class="toolbar"><input placeholder="Ҷустуҷӯ аз рӯи ном ё сана..." oninput="renderAttendanceRows(this.value)"></div><div class="table-wrap"><table><tr><th>Сана</th><th>Донишҷӯ</th><th>Ҳуҷра</th><th>Ҳолат</th><th>Эзоҳ</th>${isManager()?"<th>Амал</th>":""}</tr><tbody id="attendanceRows"></tbody></table></div>`;renderAttendanceRows("")}
 function renderAttendanceRows(x){x=String(x||"").toLowerCase();const mgr=isManager();const list=[...state.attendance].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).filter(a=>!x||`${studentName(a.studentId)} ${a.date||""}`.toLowerCase().includes(x));$("attendanceRows").innerHTML=list.map(a=>`<tr><td>${esc(a.date)}</td><td>${esc(studentName(a.studentId))}</td><td>${esc(roomName(a.roomId))}</td><td>${att(a.status)}</td><td>${esc(a.note||"—")}</td>${mgr?`<td class="action-cell"><button class="link-btn" onclick="openEditAttendance('${a.id}')">Ислоҳ</button><button class="link-btn danger" onclick="deleteAttendance('${a.id}')">Нест</button></td>`:""}</tr>`).join("")||`<tr><td colspan="6">Сабт ёфт нашуд.</td></tr>`}
@@ -115,7 +115,7 @@ function openBulkAttendance(){const students=state.students.filter(s=>s.status==
 function renderBulkList(){const rid=$("bulkRoom")?.value||"";const students=state.students.filter(s=>s.status==="Active"&&(!rid||s.roomId===rid));$("bulkList").innerHTML=students.map(s=>`<div class="bulk-row" data-sid="${s.id}"><label class="checkbox-row"><input type="checkbox" class="bulk-check" checked>${esc(s.name)}</label><select class="bulk-status"><option value="present">Ҳозир</option><option value="absent">Ғоиб</option><option value="permission">Иҷозат</option><option value="sick">Бемор</option></select></div>`).join("")||"<p>Донишҷӯ нест.</p>"}
 function markAllBulk(v){document.querySelectorAll(".bulk-row").forEach(row=>{row.querySelector(".bulk-check").checked=true;row.querySelector(".bulk-status").value=v})}
 async function saveBulkAttendance(){const dateVal=$("bulkDate").value;const rows=[...document.querySelectorAll(".bulk-row")].filter(r=>r.querySelector(".bulk-check").checked);if(!rows.length)return err("Ҳеҷ донишҷӯ интихоб нашудааст.");const batch=writeBatch(db);for(const row of rows){const sid=row.dataset.sid,s=state.students.find(x=>x.id===sid);if(!s)continue;const ref=doc(collection(db,"attendance"));batch.set(ref,{studentId:sid,roomId:s.roomId||null,supervisorId:isManager()?(s.supervisorId||uid()):uid(),date:dateVal,status:row.querySelector(".bulk-status").value,note:"",createdAt:serverTimestamp()})}await batch.commit();closeModal();ok(`${rows.length} сабт илова шуд.`);await loadData();renderPage()}
-
+ 
 /* ---------- violations ---------- */
 function violationsPage(){$("content").innerHTML=`<div class="page-head"><div><h2>Қоидавайронкунӣ</h2></div><button class="btn btn-primary" onclick="openViolation()">+ Сабт</button></div><div class="toolbar"><input placeholder="Ҷустуҷӯ аз рӯи ном ё дараҷа..." oninput="renderViolationRows(this.value)"></div><div class="table-wrap"><table><tr><th>Донишҷӯ</th><th>Ҳуҷра</th><th>Тавсиф</th><th>Дараҷа</th>${isManager()?"<th>Амал</th>":""}</tr><tbody id="violationRows"></tbody></table></div>`;renderViolationRows("")}
 function renderViolationRows(x){x=String(x||"").toLowerCase();const mgr=isManager();const list=state.violations.filter(v=>!x||`${studentName(v.studentId)} ${v.severity||""}`.toLowerCase().includes(x));$("violationRows").innerHTML=list.map(v=>`<tr><td>${esc(studentName(v.studentId))}</td><td>${esc(roomName(v.roomId))}</td><td>${esc(v.description)}</td><td>${esc(v.severity||"—")}</td>${mgr?`<td class="action-cell"><button class="link-btn" onclick="openEditViolation('${v.id}')">Ислоҳ</button><button class="link-btn danger" onclick="deleteViolation('${v.id}')">Нест</button></td>`:""}</tr>`).join("")||`<tr><td colspan="5">Сабт ёфт нашуд.</td></tr>`}
@@ -124,7 +124,7 @@ async function saveViolation(){const sid=$("violationStudent").value,s=state.stu
 function openEditViolation(id){const v=state.violations.find(x=>x.id===id);if(!v)return;modal(`<h2>Ислоҳи қоидавайронкунӣ</h2><div class="form-group"><label>Донишҷӯ</label><input value="${esc(studentName(v.studentId))}" disabled></div><div class="form-group"><label>Дараҷа</label><select id="violationSeverity"><option${v.severity==="Одатӣ"?" selected":""}>Одатӣ</option><option${v.severity==="Муҳим"?" selected":""}>Муҳим</option><option${v.severity==="Ҷиддӣ"?" selected":""}>Ҷиддӣ</option></select></div><div class="form-group"><label>Тавсиф</label><textarea id="violationDescription">${esc(v.description||"")}</textarea></div><button class="btn btn-primary" onclick="updateViolation('${id}')">Нигоҳ доштан</button>`)}
 async function updateViolation(id){const d=$("violationDescription").value.trim();if(!d)return err("Тавсифро ворид кунед.");await updateDoc(doc(db,"violations",id),{description:d,severity:$("violationSeverity").value});closeModal();ok("Тағйирот нигоҳ дошта шуд.");await loadData();renderPage()}
 async function deleteViolation(id){if(!confirm("Ин сабт нест карда шавад?"))return;await deleteDoc(doc(db,"violations",id));ok("Сабт нест карда шуд.");await loadData();renderPage()}
-
+ 
 /* ---------- cleanliness (with room leaderboard) ---------- */
 function cleanlinessPage(){
  const byRoom={};state.cleanliness.forEach(x=>{(byRoom[x.roomId]=byRoom[x.roomId]||[]).push(x.total||0)});
@@ -136,7 +136,7 @@ function cleanlinessPage(){
 }
 function openCleanliness(){modal(`<h2>Арзёбии тозагӣ</h2><div class="form-group"><label>Сана</label><input id="cleanDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ҳуҷра</label><select id="cleanRoom">${state.rooms.filter(r=>r.type==="student").map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div>${["Фарш","Катҳо","Тиреза","Санитария","Тартиби умумӣ"].map((x,i)=>`<div class="form-group"><label>${x}</label><input id="clean${i+1}" type="number" min="0" max="10" value="10"></div>`).join("")}<button class="btn btn-primary" onclick="saveCleanliness()">Сабт</button>`)}
 async function saveCleanliness(){const v=[1,2,3,4,5].map(i=>Number($("clean"+i).value));if(v.some(x=>x<0||x>10))return err("Ҳар меъёр 0–10 бошад.");await addDoc(collection(db,"cleanliness_inspections"),{roomId:$("cleanRoom").value,supervisorId:uid(),date:$("cleanDate").value,criteria:v,total:v.reduce((a,b)=>a+b,0),createdAt:serverTimestamp()});closeModal();ok("Арзёбӣ сабт шуд.");await loadData();renderPage()}
-
+ 
 /* ---------- supervisors ---------- */
 function supervisorsPage(){if(!isManager()){$("content").innerHTML=`<div class="section-card"><h2>Мураббӣ</h2><p>Ҳуҷраҳо: ${(state.profile.assignedRoomIds||[]).map(roomName).join(", ")||"—"}</p></div>`;return}
 $("content").innerHTML=`<div class="page-head"><div><h2>Мураббиён</h2><p>Идоракунии мураббиён</p></div><button class="btn btn-primary" onclick="openAddSupervisor()">+ Мураббии нав</button></div><div class="table-wrap"><table><tr><th>Ном</th><th>Email</th><th>Телефон</th><th>Ҳуҷраҳо</th></tr>${state.supervisors.map(s=>`<tr><td>${esc(s.name||"—")}</td><td>${esc(s.email||"—")}</td><td>${esc(s.phone||"—")}</td><td>${(s.assignedRoomIds||[]).map(roomName).map(esc).join(", ")||"—"}</td></tr>`).join("")}</table></div>`}
@@ -144,12 +144,12 @@ function openAddSupervisor(){modal(`<h2>Мураббии нав</h2><div class="
 async function createSupervisorInvitation(){const name=$("inviteName").value.trim(),email=$("inviteEmail").value.trim(),phone=$("invitePhone").value.trim(),rooms=[...document.querySelectorAll(".invite-room-checkbox:checked")].map(x=>x.value);if(!name||!email)return err("Ном ва email-ро пур кунед.");if(!rooms.length)return err("Ҳуҷра интихоб кунед.");const code=inviteCode();await setDoc(doc(db,"invitations",code),{name,email,phone,roomIds:rooms,role:"supervisor",status:"pending",createdBy:uid(),createdAt:serverTimestamp()});closeModal();modal(`<h2>Даъват сохта шуд ✅</h2><div class="invite-code">${code}</div><p>Email: <b>${esc(email)}</b></p><button class="btn btn-primary" onclick="closeModal()">Хуб</button>`)}
 function openAssignSupervisor(roomId){modal(`<h2>Таъини мураббӣ</h2><select id="roomSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select><button class="btn btn-primary" onclick="assignSupervisorToRoom('${roomId}')">Сабт</button>`)}
 async function assignSupervisorToRoom(roomId){const sid=$("roomSupervisor").value;await updateDoc(doc(db,"rooms",roomId),{supervisorId:sid});const r=doc(db,"users",sid),s=await getDoc(r);if(s.exists())await updateDoc(r,{assignedRoomIds:[...new Set([...(s.data().assignedRoomIds||[]),roomId])]});closeModal();ok("Мураббӣ таъин шуд.");await loadData();renderPage()}
-
+ 
 /* ---------- routing ---------- */
 function renderPage(){const t={dashboard:["Dashboard","Идоракунии хобгоҳ"],students:["Донишҷӯён","Идоракунии донишҷӯён"],rooms:["Ҳуҷраҳо","Ҷойҳои хоб"],attendance:["Давомот","Назорати ҳузур"],violations:["Қоидавайронкунӣ","Назорати қоидаҳо"],cleanliness:["Озмуни тозагӣ","Арзёбии ҳуҷраҳо"],supervisors:["Мураббиён","Идоракунии мураббиён"]};$("title").textContent=t[state.page]?.[0]||"Dashboard";$("subtitle").textContent=t[state.page]?.[1]||"";document.querySelectorAll("#nav [data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===state.page));({dashboard:dashboardPage,students:studentsPage,rooms:roomsPage,attendance:attendancePage,violations:violationsPage,cleanliness:cleanlinessPage,supervisors:supervisorsPage}[state.page]||dashboardPage)()}
-
+ 
 onAuthStateChanged(auth,async user=>{if(!user){state.user=null;state.profile=null;renderLogin();return}try{state.user=user;const p=await getDoc(doc(db,"users",user.uid));if(!p.exists())throw Error("Профили корбар вуҷуд надорад.");state.profile={id:user.uid,...p.data()};if(!["manager","supervisor"].includes(state.profile.role))throw Error("Нақши корбар нодуруст аст.");shell();await seedRooms();await loadData();renderPage()}catch(e){console.error(e);err(e.message);await signOut(auth);renderLogin()}});
-
+ 
 if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(e=>console.warn("SW registration failed:",e))})}
-
+ 
 Object.assign(window,{login,logout,renderLogin,renderSupervisorRegistration,registerSupervisor,closeModal,openAddStudent,createStudent,openStudent,openEditStudent,updateStudent,deleteStudent,openTransferStudent,confirmTransfer,removeFromRoom,renderStudentRows,openRoom,renderRoomCards,openAssignStudent,assignStudent,openAttendance,saveAttendance,openEditAttendance,updateAttendance,deleteAttendance,renderAttendanceRows,openBulkAttendance,renderBulkList,markAllBulk,saveBulkAttendance,openViolation,saveViolation,openEditViolation,updateViolation,deleteViolation,renderViolationRows,openCleanliness,saveCleanliness,openAddSupervisor,createSupervisorInvitation,openAssignSupervisor,assignSupervisorToRoom});
