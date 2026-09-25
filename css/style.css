@@ -262,9 +262,12 @@ textarea{min-height:84px;resize:vertical}
   .main{margin-left:220px}
 }
 
+.sidebar-overlay{display:none}
+
 @media(max-width:650px){
-  .sidebar{position:fixed;transform:translateX(-100%);transition:transform .2s ease;box-shadow:0 0 0 2000px rgba(0,0,0,0)}
+  .sidebar{position:fixed;transform:translateX(-100%);transition:transform .2s ease;box-shadow:0 0 0 2000px rgba(0,0,0,0);z-index:20}
   .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.25)}
+  .sidebar-overlay.show{display:block;position:fixed;inset:0;background:rgba(8,26,17,.4);z-index:16}
   .main{margin-left:0}
   .main header{padding:0 16px}
   .main header #menu{display:block}
@@ -328,3 +331,68 @@ body.is-loading #content{opacity:.5;pointer-events:none;transition:opacity .15s 
   .lb-bar{display:none}
 }
 
+/* ==========================================================================
+   Added: attendance journal, weekly activity table, tea menu, duty roster,
+   daily stage confirmations, staff chat
+   ========================================================================== */
+
+/* ---------- attendance journal ---------- */
+.journal-list{display:grid;gap:8px}
+.journal-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 14px;
+}
+.jr-name{display:flex;flex-direction:column;font-weight:600;font-size:14px}
+.jr-name small{font-weight:500;color:var(--ink-faint);font-size:12px}
+.jr-actions{display:flex;align-items:center;gap:8px}
+.jr-btn{
+  width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);
+  background:var(--surface);font-size:18px;font-weight:700;cursor:pointer;
+  color:var(--ink-faint);transition:all .12s ease;
+}
+.jr-minus.active{background:var(--rust-tint);border-color:var(--rust);color:var(--rust)}
+.jr-plus.active{background:var(--brand-tint);border-color:var(--brand);color:var(--brand-dark)}
+.jr-other{width:110px;font-size:12.5px;padding:8px}
+
+/* ---------- weekly activity table ---------- */
+.activity-cell{cursor:pointer}
+.activity-cell:hover{background:var(--brand-tint)}
+
+/* ---------- tea recipe menu ---------- */
+.tea-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.tea-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:16px;cursor:pointer;transition:border-color .15s ease,transform .1s ease;box-shadow:var(--shadow-soft);
+}
+.tea-card:hover{border-color:var(--brand);transform:translateY(-1px)}
+.tea-card p{color:var(--ink-soft);font-size:13px;margin-top:6px}
+
+/* ---------- duty roster ---------- */
+.today-row td{background:var(--brand-tint);font-weight:700}
+.stage-list{display:grid;gap:10px}
+.stage-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 14px;font-size:14px;
+}
+.stage-row.confirmed{border-color:var(--brand);background:var(--brand-tint)}
+.stage-row small{color:var(--brand-dark);font-weight:600}
+
+/* ---------- staff chat ---------- */
+.chat-box{
+  height:420px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:16px;display:flex;flex-direction:column;gap:10px;
+}
+.chat-msg{max-width:70%;background:var(--surface-tint);border-radius:var(--radius-sm);padding:8px 12px;align-self:flex-start}
+.chat-msg.mine{align-self:flex-end;background:var(--brand-tint)}
+.chat-msg b{display:block;font-size:12px;color:var(--brand-dark);margin-bottom:2px}
+.chat-msg p{font-size:14px;margin:0}
+.chat-input-row{display:flex;gap:10px;margin-top:12px}
+.chat-input-row input{flex:1}
+
+@media(max-width:650px){
+  .journal-row{flex-direction:column;align-items:flex-start}
+  .jr-actions{width:100%;justify-content:flex-start}
+  .chat-msg{max-width:88%}
+}
