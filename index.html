@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dormitory Management System</title>
-  <link rel="icon" type="image/png" href="assets/dormitory-logo.png">
-  <meta name="theme-color" content="#0b5d3b">
+<link rel="icon" type="image/png" href="assets/dormitory-logo.png">
+<link rel="apple-touch-icon" href="assets/dormitory-logo.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b5d3b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dormitory">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,7 +24,7 @@
       <button data-page="dashboard">📊 Dashboard</button>
       <button data-page="students">👨‍🎓 Донишҷӯён</button>
       <button data-page="rooms">🛏️ Ҳуҷраҳо</button>
-      <button data-page="attendance">📋 Attendance</button>
+      <button data-page="attendance">📋 Давомот</button>
       <button data-page="violations">⚠️ Қоидавайронкунӣ</button>
       <button data-page="cleanliness">🏆 Озмуни тозагӣ</button>
       <button data-page="supervisors">👥 Мураббиён</button>
@@ -24,7 +32,7 @@
     <div class="sidebar-bottom"><span id="roleBadge">Manager</span><button id="logout">Баромадан</button></div>
   </aside>
   <main class="main">
-    <header><button id="menu">☰</button><div><h1 id="title">Dashboard</h1><p id="subtitle">Идоракунии хобгоҳи мактаб</p></div><div class="user">👤 <span id="userName">Manager</span></div></header>
+    <header><button id="menu">☰</button><div><h1 id="title">Dashboard</h1><p id="subtitle">Идоракунии хобгоҳ</p></div><div class="user">👤 <span id="userName">Manager</span></div></header>
     <section id="content"></section>
   </main>
 </div>
