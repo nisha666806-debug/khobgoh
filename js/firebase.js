@@ -26,7 +26,8 @@ import {
   limit,
   serverTimestamp,
   runTransaction,
-  writeBatch
+  writeBatch,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
  
 const firebaseConfig = {
@@ -70,5 +71,6 @@ export {
   limit,
   serverTimestamp,
   runTransaction,
-  writeBatch
+  writeBatch,
+  onSnapshot
 };
