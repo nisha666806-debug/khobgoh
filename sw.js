@@ -1,4 +1,4 @@
-const CACHE = "khobgoh-v4-residence-permissions";
+const CACHE = "khobgoh-v6-permission-fix";
 const SHELL = [
   "./",
   "./index.html",

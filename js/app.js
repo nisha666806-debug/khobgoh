@@ -80,8 +80,8 @@ function startListening(){
   ["roster",collection(db,"duty_roster")],
   ["activities",collection(db,"activities")],
   ["dailySchedule",collection(db,"daily_schedule")],
-  ["dutyLogs",collection(db,"duty_logs")],
-  ["wakeConfirms",query(collection(db,"wake_confirmations"),where("date","==",todayStr()))],
+  ["dutyLogs",el?collection(db,"duty_logs"):query(collection(db,"duty_logs"),where("userId","==",uid()))],
+  ["wakeConfirms",el?query(collection(db,"wake_confirmations"),where("date","==",todayStr())):query(collection(db,"wake_confirmations"),where("date","==",todayStr()),where("userId","==",uid()))],
   ["stageConfirms",collection(db,"stage_confirmations")],
   ["chat",query(collection(db,"chat_messages"),orderBy("createdAt","asc"),limit(200))]
  ];
@@ -327,7 +327,7 @@ function rosterPage(){
  <div class="section-card"><h3>Фаъолиятҳои имрӯза</h3>${renderStagesBoard()}</div>`;
 }
 function openEditRoster(k){const rec=state.roster.find(x=>x.id===k);modal(`<h2>Навбатдории ${DAY_LABELS[k]}</h2><div class="form-group"><label>Мураббиён</label>${state.supervisors.map(s=>`<label class="checkbox-row"><input type="checkbox" class="roster-check" value="${s.id}"${(rec?.supervisorIds||[]).includes(s.id)?" checked":""}>${esc(s.name||s.email)}</label>`).join("")}</div><div class="form-group"><label>Оғоз</label><input id="dutyStart" type="time" value="${esc(rec?.startTime||"")}"></div><div class="form-group"><label>Анҷом</label><input id="dutyEnd" type="time" value="${esc(rec?.endTime||"")}"></div><div class="form-group"><label>Номи навбат</label><input id="dutyTitle" value="${esc(rec?.title||"Навбатдорӣ")}"></div><button class="btn btn-primary" onclick="saveRoster('${k}')">Нигоҳ доштан</button>`)}
-async function saveRoster(k){const ids=[...document.querySelectorAll(".roster-check:checked")].map(x=>x.value);const start=$("dutyStart")?.value||"";const end=$("dutyEnd")?.value||"";const title=$("dutyTitle")?.value.trim()||"Навбатдорӣ";await setDoc(doc(db,"duty_roster",k),{id:k,supervisorIds:ids,startTime:start,endTime:end,title,updatedAt:serverTimestamp()},{merge:true});closeModal();ok("Навбатдорӣ нигоҳ дошта шуд.")}
+async function saveRoster(k){const ids=[...document.querySelectorAll(".roster-check:checked")].map(x=>x.value);const start=$("dutyStart")?.value||"";const end=$("dutyEnd")?.value||"";const title=$("dutyTitle")?.value.trim()||"Навбатдорӣ";await setDoc(doc(db,"duty_roster",k),{id:k,day:k,supervisorIds:ids,startTime:start,endTime:end,title,updatedAt:serverTimestamp()},{merge:true});closeModal();ok("Навбатдорӣ нигоҳ дошта шуд.")}
 function renderStagesBoard(){
  const stages=state.stages?.list?.length?state.stages.list:DEFAULT_STAGES;
  const ts=todayStr(),canManage=elevated();
