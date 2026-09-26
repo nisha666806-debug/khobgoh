@@ -344,7 +344,11 @@ function openDailyScheduleManager(){
 }
 async function saveDailySchedule(){const title=$("dailyTitle").value.trim(),startTime=$("dailyTime").value,days=[...document.querySelectorAll(".daily-day:checked")].map(x=>x.value);if(!title||!startTime||!days.length)return err("Ном, вақт ва рӯзҳоро пур кунед.");await addDoc(collection(db,"daily_schedule"),{title,startTime,days,enabled:true,createdBy:uid(),createdAt:serverTimestamp()});closeModal();ok("Фаъолият ба ҷадвал илова шуд.");}
 async function deleteDailySchedule(id){if(!confirm("Ин фаъолият нест карда шавад?"))return;await deleteDoc(doc(db,"daily_schedule",id));openDailyScheduleManager();}
-function openWakeManager(){modal(`<h2>🌅 Вақти бедоршавӣ</h2><div class="form-group"><label>Вақти умумии бедоршавӣ</label><input id="wakeTime" type="time" value="${esc(state.wakeSettings?.time||"06:30")}"></div><button class="btn btn-primary" onclick="saveWakeManager()">Нигоҳ доштан</button>`)}
+function openWakeManager(){
+ const list=[...state.wakeConfirms].sort((a,b)=>(a.confirmedAt||"").localeCompare(b.confirmedAt||""));
+ modal(`<h2>🌅 Вақти бедоршавӣ</h2><div class="form-group"><label>Вақти умумии бедоршавӣ</label><input id="wakeTime" type="time" value="${esc(state.wakeSettings?.time||"06:30")}"></div><button class="btn btn-primary" onclick="saveWakeManager()">Нигоҳ доштан</button>
+ <h3 style="margin-top:20px">Бедоршавии имрӯза</h3><div class="table-wrap"><table><tr><th>Ном</th><th>Вақт</th></tr>${list.map(m=>`<tr><td>${esc(m.userName||"—")}</td><td>${chatTime(m.confirmedAt)}</td></tr>`).join("")||'<tr><td colspan="2">Ҳанӯз ҳеҷ кас тасдиқ накардааст.</td></tr>'}</table></div>`);
+}
 async function saveWakeManager(){const time=$("wakeTime").value;if(!time)return err("Вақтро интихоб кунед.");await setDoc(doc(db,"app_settings","wake_schedule"),{time,updatedAt:serverTimestamp(),updatedBy:uid()},{merge:true});closeModal();ok("Вақти бедоршавӣ нигоҳ дошта шуд.");}
  
 /* ---------- tea recipe menu ---------- */
@@ -451,3 +455,4 @@ Object.assign(window,{login,logout,renderLogin,renderSupervisorRegistration,regi
  openAddTea,saveTea,openTeaRecipe,deleteTea,
  sendChat,
  openAddSupervisor,createSupervisorInvitation,toggleHeadRole,openAssignSupervisor,assignSupervisorToRoom});
+ 
