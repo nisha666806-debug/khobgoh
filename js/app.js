@@ -1,5 +1,5 @@
 import{auth,db,registrationAuth,registrationDb,onAuthStateChanged,signInWithEmailAndPassword,signOut,createUserWithEmailAndPassword,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,orderBy,limit,serverTimestamp,runTransaction,writeBatch,onSnapshot}from"./firebase.js";
-
+ 
 const state={page:"dashboard",user:null,profile:null,students:[],rooms:[],supervisors:[],placements:[],residences:[],attendance:[],violations:[],cleanliness:[],teaRecipes:[],roster:[],activities:[],stageConfirms:[],stages:null,chat:[],dailySchedule:[],dutyLogs:[],wakeConfirms:[],wakeSettings:null,unsubs:[],_dutyNotified:false,_activityNotified:new Set()};
 const $=id=>document.getElementById(id),uid=()=>auth.currentUser?.uid||"";
 const isManager=()=>state.profile?.role==="manager",isHead=()=>state.profile?.role==="head",elevated=()=>isManager()||isHead();
@@ -23,7 +23,7 @@ function status(s){return({Active:"Фаъол","Temporarily absent":"Ғоиб",T
 function att(s){return({present:"Ҳозир",absent:"Ғоиб",permission:"Иҷозат",sick:"Бемор"})[s]||s||"—"}
 function todayStr(){return new Date().toISOString().slice(0,10)}
 function todayKey(){return DAY_KEYS[new Date().getDay()]}
-
+ 
 /* ---------- toast notifications ---------- */
 function toast(msg,type="info"){
   let wrap=$("toastWrap");
@@ -34,7 +34,7 @@ function toast(msg,type="info"){
 }
 const ok=m=>toast(m,"ok"),err=m=>toast(m,"err");
 function setLoading(v){document.body.classList.toggle("is-loading",v)}
-
+ 
 /* ---------- login / registration ---------- */
 function renderLogin(){document.body.innerHTML=`<div class="login-page"><div class="login-card"><div class="login-logo"><img src="assets/dormitory-logo.png"></div><h1>Dormitory</h1><p class="login-subtitle">Системаи идоракунии хобгоҳ</p><div class="form-group"><label>Email</label><input id="loginEmail" type="email"></div><div class="form-group"><label>Парол</label><input id="loginPassword" type="password"></div><button class="btn btn-primary" onclick="login()">Ворид шудан</button><div class="register-link">Мураббӣ ҳастед? <button onclick="renderSupervisorRegistration()">Бақайдгирӣ</button></div></div></div>`}
 async function login(){const e=$("loginEmail")?.value.trim(),p=$("loginPassword")?.value;if(!e||!p)return err("Email ва паролро ворид кунед.");try{await signInWithEmailAndPassword(auth,e,p)}catch(e){console.error(e);err("Email ё парол нодуруст аст.")}}
@@ -49,7 +49,7 @@ async function registerSupervisor(){
  await signOut(registrationAuth);ok("Бақайдгирӣ бомуваффақият анҷом ёфт.");renderLogin();
  }catch(e){console.error(e);err("Хатогӣ: "+e.message)}
 }
-
+ 
 /* ---------- shell ---------- */
 function shell(){
  document.body.innerHTML=`<div id="app"><aside class="sidebar"><div class="brand"><div class="logo brand-icon"><img src="assets/dormitory-logo.png"></div><div><b>Dormitory</b><small>Management System</small></div></div><nav id="nav"><button data-page="dashboard">📊 Dashboard</button><button data-page="students">👨‍🎓 Талабаҳо</button><button data-page="rooms">🛏️ Ҳуҷраҳо</button><button data-page="attendance">📋 Давомот</button><button data-page="violations">⚠️ Қоидавайронкунӣ</button><button data-page="cleanliness">🏆 Озмуни тозагӣ</button><button data-page="roster">🗓️ Навбатдорӣ</button><button data-page="tea">🍵 Чойнӯшӣ</button><button data-page="chat">💬 Чат</button><button data-page="supervisors">👥 Мураббиён</button></nav><div class="sidebar-bottom"><span>${esc(roleLabel(state.profile?.role))}</span><button id="logout">Баромадан</button></div></aside><div id="sidebarOverlay" class="sidebar-overlay"></div><main class="main"><div id="loadingBar" class="loading-bar"></div><header><button id="menu">☰</button><div><h1 id="title">Dashboard</h1><p id="subtitle">Идоракунии хобгоҳ</p></div><div class="user">👤 ${esc(state.profile?.name||state.profile?.email)}</div></header><section id="content"></section></main></div><div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><div id="modalContent"></div></div></div>`;
@@ -60,7 +60,7 @@ function shell(){
  $("sidebarOverlay").onclick=closeSidebar;
 }
 async function seedRooms(){if(!elevated())return;const s=await getDocs(collection(db,"rooms"));if(!s.empty)return;for(let i=1;i<=10;i++){const id=`room${String(i).padStart(2,"0")}`;await setDoc(doc(db,"rooms",id),{id,number:i,name:`Ҳуҷра №${i}`,type:i<=7?"student":"supervisor",capacity:i<=7?8:4,supervisorId:null,createdAt:serverTimestamp()})}}
-
+ 
 /* ---------- real-time listeners ---------- */
 function clearListeners(){state.unsubs.forEach(u=>{try{u()}catch(e){}});state.unsubs=[]}
 function startListening(){
@@ -112,7 +112,7 @@ function checkDutyNotice(){
  const rec=state.roster.find(r=>r.id===todayKey());
  if(rec?.supervisorIds?.includes(uid())){state._dutyNotified=true;toast("Шумо имрӯз навбатдор ҳастед 🔔","ok")}
 }
-
+ 
 /* ---------- automatic daily activities / wake-up / duty ---------- */
 function notifyUser(title,body,key){
   toast(`${title}: ${body}`,"ok");
@@ -174,7 +174,7 @@ function dutyCard(){
  const d=myActiveDuty(); if(!d)return ""; const log=state.dutyLogs.find(x=>x.rosterId===d.id&&x.userId===uid());
  return `<div class="section-card duty-live-card"><div><span class="live-badge">🛡️ НАВБАТДОРӢ</span><h3>${esc(d.title||"Навбатдорӣ")}</h3><p>${esc(d.startTime)} — ${esc(d.endTime)}</p><p>${log?.endedAt?`Анҷом: ${chatTime(log.endedAt)}`:"Навбат идома дорад."}</p></div>${!log?.endedAt?`<button class="btn btn-danger" onclick="finishDuty('${d.id}')">Ба анҷом расонидан</button>`:""}</div>`;
 }
-
+ 
 /* ---------- dashboard ---------- */
 let trendChart=null;
 const MONTHS_TG=["Янв","Фев","Март","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
@@ -195,7 +195,7 @@ function renderTrendChart(){
   {label:"Қоидавайронкунӣ",data:violations,borderColor:"#0b5d3b",backgroundColor:"rgba(11,93,59,.12)",tension:.3,fill:true}
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{family:"Manrope"}}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
-
+ 
 /* ---------- weekly activity table ---------- */
 function renderActivityTable(){
  const days=["mon","tue","wed","thu","fri","sat","sun"];
@@ -214,7 +214,7 @@ function renderActivityTable(){
 }
 function openActivity(dk,cls){const a=state.activities.find(x=>x.day===dk&&x.className===cls);modal(`<h2>${DAY_LABELS[dk]} — ${esc(cls)}</h2><div class="form-group"><label>Фаъолият</label><input id="activityText" value="${esc(a?.activity||"")}"></div><button class="btn btn-primary" onclick="saveActivity('${dk}','${jsStr(cls)}')">Нигоҳ доштан</button>`)}
 async function saveActivity(dk,cls){const v=$("activityText").value.trim();await setDoc(doc(db,"activities",`${dk}_${cls}`),{day:dk,className:cls,activity:v,updatedAt:serverTimestamp()},{merge:true});closeModal();ok("Ҷадвал нав шуд.")}
-
+ 
 /* ---------- students ---------- */
 function studentsPage(){
  if($("studentRows")){renderStudentRows($("studentSearch")?.value||"");return}
@@ -253,7 +253,7 @@ async function deleteStudent(id){if(!isManager())return err("Танҳо Manager 
 function openTransferStudent(sid){const s=state.students.find(x=>x.id===sid);if(!s)return;const sup=state.profile?.role==="supervisor";const rooms=state.rooms.filter(r=>r.type==="student"&&r.id!==s.roomId&&(!sup||(state.profile.assignedRoomIds||[]).includes(r.id)));if(sup)return err("Мураббӣ танҳо ҳуҷраи ба худ вобастаро идора мекунад. Барои гузаронидан ба ҳуҷраи дигар Manager амал мекунад.");modal(`<h2>Гузарондани ${esc(s.name)}</h2><div class="form-group"><label>Ҳуҷраи нав</label><select id="transferRoom">${rooms.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><input id="transferPlace" type="number" min="1"></div><div class="form-group"><label>Мураббӣ</label><select id="transferSupervisor">${state.supervisors.map(x=>`<option value="${x.id}">${esc(x.name||x.email)}</option>`).join("")}</select></div><div class="form-group"><label>Санаи гузариш</label><input id="transferDate" type="date" value="${todayStr()}"></div><button class="btn btn-primary" onclick="confirmTransfer('${sid}')">Гузарондан</button>`)}
 async function confirmTransfer(sid){const rid=$("transferRoom").value,p=Number($("transferPlace").value),sp=$("transferSupervisor").value,startDate=$("transferDate").value||todayStr();if(!rid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),ss=await t.get(sr),rs=await t.get(rr);if(!ss.exists())throw Error("Талаба ёфт нашуд.");if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(p<1||p>cap(rs.data()))throw Error("Ҷойи хоб нодуруст аст.");if(state.students.some(s=>s.id!==sid&&s.status==="Active"&&s.roomId===rid&&Number(s.place)===p))throw Error("Ҷой аллакай ишғол шудааст.");const oldRes=state.residences.find(r=>r.studentId===sid&&!r.endDate);if(oldRes)t.update(doc(db,"residences",oldRes.id),{endDate:startDate});t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",admissionDate:ss.data().admissionDate||startDate,updatedAt:serverTimestamp()});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"transferred",startDate,createdAt:serverTimestamp()});const res=doc(collection(db,"residences"));t.set(res,{studentId:sid,roomId:rid,place:p,supervisorId:sp,startDate,endDate:null,createdAt:serverTimestamp()})});closeModal();ok("Талаба гузаронида шуд.")}catch(e){err(e.message)}}
 async function removeFromRoom(sid){const s=state.students.find(x=>x.id===sid);if(!s)return;const can=isManager()||(state.profile?.role==="supervisor"&&s.supervisorId===uid());if(!can)return err("Шумо ин талабаро идора карда наметавонед.");if(!confirm("Талаба аз ҳуҷра хориҷ карда шавад?"))return;const endDate=prompt("Санаи баромадан аз хобгоҳ:",todayStr())||todayStr();try{await runTransaction(db,async t=>{t.update(doc(db,"students",sid),{roomId:null,place:null,supervisorId:null,departureDate:endDate,status:"Removed",updatedAt:serverTimestamp()});const oldRes=state.residences.find(r=>r.studentId===sid&&!r.endDate);if(oldRes)t.update(doc(db,"residences",oldRes.id),{endDate});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:s.roomId||null,place:s.place||null,supervisorId:s.supervisorId||uid(),action:"removed",endDate,createdAt:serverTimestamp()})});closeModal();ok("Талаба аз ҳуҷра хориҷ шуд.")}catch(e){err(e.message)}}
-
+ 
 /* ---------- rooms (manager: full CRUD; students & supervisors sections shown separately) ---------- */
 function roomsPage(){
  if($("roomCards")){renderRoomCards($("roomSearch")?.value||"");return}
@@ -268,7 +268,7 @@ function renderRoomCards(x){
  $("roomCards").innerHTML=`<h3>Ҳуҷраҳои талабаҳо</h3><div class="room-grid large">${students.map(card).join("")||'<p>Ҳуҷра ёфт нашуд.</p>'}</div><h3 style="margin-top:22px">Ҳуҷраи мураббиён</h3><div class="room-grid large">${staffRooms.map(card).join("")||'<p>Ҳуҷра ёфт нашуд.</p>'}</div>`;
 }
 function openRoom(id){const r=state.rooms.find(x=>x.id===id);if(!r)return;const ss=state.students.filter(s=>s.roomId===id),n=cap(r);let b="";for(let i=1;i<=n;i++){const s=ss.find(x=>Number(x.place)===i);b+=`<div class="bed ${s?"occupied":"free"}" ${s?`onclick="openStudent('${s.id}')"`:""}><span>${i}</span>${s?`<strong>${esc(s.name)}</strong>`:"<small>Ҷой холӣ</small>"}</div>`}
- modal(`<h2>${esc(r.name)}</h2><p>Иқтидор: ${n} | Ишғолшуда: ${ss.length} | Холӣ: ${n-ss.length}</p><p>Мураббӣ: ${esc(supervisorName(r.supervisorId))}</p><div class="beds-grid">${r.type==="supervisor"?"":b}</div>${elevated()?`<div class="action-row">${r.type!=="supervisor"?`<button class="btn btn-primary" onclick="openAssignStudent('${id}')">+ Ҷойгиркунӣ</button>`:""}<button class="btn btn-secondary" onclick="openEditRoom('${id}')">Ислоҳи ҳуҷра</button><button class="btn btn-danger" onclick="deleteRoom('${id}')">Нест кардани ҳуҷра</button></div>`:""}`);
+ modal(`<h2>${esc(r.name)}</h2><p>Иқтидор: ${n} | Ишғолшуда: ${ss.length} | Холӣ: ${n-ss.length}</p><p>Мураббӣ: ${esc(supervisorName(r.supervisorId))}</p><div class="beds-grid">${r.type==="supervisor"?"":b}</div>${elevated()?`<div class="action-row">${r.type!=="supervisor"?`<button class="btn btn-primary" onclick="openAssignStudent('${id}')">+ Ҷойгиркунӣ</button>`:""}<button class="btn btn-secondary" onclick="openAssignSupervisor('${id}')">${r.supervisorId?"Иваз кардани мураббӣ":"Таъини мураббӣ"}</button><button class="btn btn-secondary" onclick="openEditRoom('${id}')">Ислоҳи ҳуҷра</button><button class="btn btn-danger" onclick="deleteRoom('${id}')">Нест кардани ҳуҷра</button></div>`:""}`);
 }
 function openAddRoom(){modal(`<h2>Ҳуҷраи нав</h2><div class="form-group"><label>Ном</label><input id="roomName" placeholder="Ҳуҷра №11"></div><div class="form-group"><label>Рақам</label><input id="roomNumber" type="number" min="1"></div><div class="form-group"><label>Иқтидор (ҷойҳо)</label><input id="roomCapacity" type="number" min="1" value="8"></div><div class="form-group"><label>Навъ</label><select id="roomType"><option value="student">Талабаҳо</option><option value="supervisor">Мураббиён</option></select></div><button class="btn btn-primary" onclick="saveNewRoom()">Сохтан</button>`)}
 async function saveNewRoom(){const name=$("roomName").value.trim();if(!name)return err("Номи ҳуҷраро ворид кунед.");await addDoc(collection(db,"rooms"),{name,number:Number($("roomNumber").value)||0,capacity:Number($("roomCapacity").value)||8,type:$("roomType").value,supervisorId:null,createdAt:serverTimestamp()});closeModal();ok("Ҳуҷра сохта шуд.")}
@@ -277,7 +277,7 @@ async function updateRoom(id){const name=$("roomName").value.trim();if(!name)ret
 async function deleteRoom(id){if(state.students.some(s=>s.roomId===id))return err("Аввал ҳамаи талабаҳоро аз ин ҳуҷра хориҷ кунед.");if(!confirm("Ин ҳуҷра нест карда шавад?"))return;await deleteDoc(doc(db,"rooms",id));closeModal();ok("Ҳуҷра нест карда шуд.")}
 function openAssignStudent(rid){const r=state.rooms.find(x=>x.id===rid);const free=state.students.filter(s=>s.status==="Active"&&!s.roomId),places=Array.from({length:cap(r)},(_,i)=>i+1).filter(p=>!state.students.some(s=>s.roomId===rid&&Number(s.place)===p));modal(`<h2>Ҷойгиркунӣ</h2><div class="form-group"><label>Талаба</label><select id="assignStudent">${free.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><select id="assignPlace">${places.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div><div class="form-group"><label>Мураббӣ</label><select id="assignSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select></div><div class="form-group"><label>Санаи омадан ба хобгоҳ</label><input id="assignStartDate" type="date" value="${todayStr()}"></div><button class="btn btn-primary" onclick="assignStudent('${rid}')">Тасдиқ</button>`)}
 async function assignStudent(rid){const sid=$("assignStudent").value,p=Number($("assignPlace").value),sp=$("assignSupervisor").value,startDate=$("assignStartDate").value||todayStr();if(!sid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),ss=await t.get(sr),rs=await t.get(rr);if(!ss.exists())throw Error("Талаба ёфт нашуд.");if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(p<1||p>cap(rs.data()))throw Error("Ҷойи хоб нодуруст аст.");if(state.students.some(s=>s.id!==sid&&s.status==="Active"&&s.roomId===rid&&Number(s.place)===p))throw Error("Ҷой аллакай ишғол шудааст.");t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",admissionDate:ss.data()?.admissionDate||startDate,departureDate:null,updatedAt:serverTimestamp()});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"assigned",startDate,createdAt:serverTimestamp()});const res=doc(collection(db,"residences"));t.set(res,{studentId:sid,roomId:rid,place:p,supervisorId:sp,startDate,endDate:null,createdAt:serverTimestamp()})});closeModal();ok("Талаба ҷойгир карда шуд.")}catch(e){err(e.message)}}
-
+ 
 /* ---------- attendance journal (tap + / − ) ---------- */
 function attendancePage(){
  if($("journalRows")){renderJournal();return}
@@ -294,7 +294,7 @@ function renderJournal(){
  }).join("")||"<p>Талаба ёфт нашуд.</p>";
 }
 async function markJournal(sid,dateVal,status){if(!status)return;const s=state.students.find(x=>x.id===sid);if(!s)return;await setDoc(doc(db,"attendance",`${sid}_${dateVal}`),{studentId:sid,roomId:s.roomId||null,supervisorId:elevated()?(s.supervisorId||uid()):uid(),date:dateVal,status,note:"",createdAt:serverTimestamp()},{merge:true})}
-
+ 
 /* ---------- violations ---------- */
 function violationsPage(){
  if($("violationRows")){renderViolationRows($("violationSearch")?.value||"");return}
@@ -306,7 +306,7 @@ async function saveViolation(){const sid=$("violationStudent").value,s=state.stu
 function openEditViolation(id){const v=state.violations.find(x=>x.id===id);if(!v)return;modal(`<h2>Ислоҳи қоидавайронкунӣ</h2><div class="form-group"><label>Талаба</label><input value="${esc(studentName(v.studentId))}" disabled></div><div class="form-group"><label>Дараҷа</label><select id="violationSeverity"><option${v.severity==="Одатӣ"?" selected":""}>Одатӣ</option><option${v.severity==="Муҳим"?" selected":""}>Муҳим</option><option${v.severity==="Ҷиддӣ"?" selected":""}>Ҷиддӣ</option></select></div><div class="form-group"><label>Тавсиф</label><textarea id="violationDescription">${esc(v.description||"")}</textarea></div><button class="btn btn-primary" onclick="updateViolation('${id}')">Нигоҳ доштан</button>`)}
 async function updateViolation(id){const d=$("violationDescription").value.trim();if(!d)return err("Тавсифро ворид кунед.");await updateDoc(doc(db,"violations",id),{description:d,severity:$("violationSeverity").value});closeModal();ok("Тағйирот нигоҳ дошта шуд.")}
 async function deleteViolation(id){if(!confirm("Ин сабт нест карда шавад?"))return;await deleteDoc(doc(db,"violations",id));ok("Сабт нест карда шуд.")}
-
+ 
 /* ---------- cleanliness (with leaderboard) ---------- */
 function cleanlinessPage(){
  const byRoom={};state.cleanliness.forEach(x=>{(byRoom[x.roomId]=byRoom[x.roomId]||[]).push(x.total||0)});
@@ -318,7 +318,7 @@ function cleanlinessPage(){
 }
 function openCleanliness(){modal(`<h2>Арзёбии тозагӣ</h2><div class="form-group"><label>Сана</label><input id="cleanDate" type="date" value="${todayStr()}"></div><div class="form-group"><label>Ҳуҷра</label><select id="cleanRoom">${state.rooms.filter(r=>r.type==="student").map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div>${["Фарш","Катҳо","Тиреза","Санитария","Тартиби умумӣ"].map((x,i)=>`<div class="form-group"><label>${x}</label><input id="clean${i+1}" type="number" min="0" max="10" value="10"></div>`).join("")}<button class="btn btn-primary" onclick="saveCleanliness()">Сабт</button>`)}
 async function saveCleanliness(){const v=[1,2,3,4,5].map(i=>Number($("clean"+i).value));if(v.some(x=>x<0||x>10))return err("Ҳар меъёр 0–10 бошад.");await addDoc(collection(db,"cleanliness_inspections"),{roomId:$("cleanRoom").value,supervisorId:uid(),date:$("cleanDate").value,criteria:v,total:v.reduce((a,b)=>a+b,0),createdAt:serverTimestamp()});closeModal();ok("Арзёбӣ сабт шуд.")}
-
+ 
 /* ---------- duty roster + daily stage confirmations ---------- */
 function rosterPage(){
  const canEdit=elevated(),tk=todayKey();
@@ -336,7 +336,7 @@ function renderStagesBoard(){
 async function confirmStage(key,label){await setDoc(doc(db,"stage_confirmations",`${todayStr()}_${key}`),{date:todayStr(),stageKey:key,label,confirmedBy:uid(),confirmedByName:state.profile?.name||state.profile?.email,createdAt:serverTimestamp()});ok("Тасдиқ шуд.")}
 function openEditStages(){const stages=state.stages?.list?.length?state.stages.list:DEFAULT_STAGES;modal(`<h2>Марҳалаҳои рӯз</h2><div class="form-group"><label>Ҳар марҳала дар як сатр нависед</label><textarea id="stagesText" rows="6">${stages.map(s=>esc(s.label)).join("\n")}</textarea></div><button class="btn btn-primary" onclick="saveStages()">Нигоҳ доштан</button>`)}
 async function saveStages(){const lines=$("stagesText").value.split("\n").map(x=>x.trim()).filter(Boolean);if(!lines.length)return err("Камаш як марҳала нависед.");const list=lines.map((label,i)=>({key:"s"+i,label}));await setDoc(doc(db,"app_settings","daily_stages"),{list},{merge:false});closeModal();ok("Рӯйхати марҳалаҳо нав шуд.")}
-
+ 
 /* ---------- admin daily schedule + wake settings ---------- */
 function openDailyScheduleManager(){
  const rows=state.dailySchedule.map(a=>`<div class="schedule-row"><b>${esc(a.title)}</b><span>${esc(a.startTime)}</span><button class="link-btn danger" onclick="deleteDailySchedule('${a.id}')">Нест</button></div>`).join("")||"<p>Ҳанӯз ҷадвал нест.</p>";
@@ -346,7 +346,7 @@ async function saveDailySchedule(){const title=$("dailyTitle").value.trim(),star
 async function deleteDailySchedule(id){if(!confirm("Ин фаъолият нест карда шавад?"))return;await deleteDoc(doc(db,"daily_schedule",id));openDailyScheduleManager();}
 function openWakeManager(){modal(`<h2>🌅 Вақти бедоршавӣ</h2><div class="form-group"><label>Вақти умумии бедоршавӣ</label><input id="wakeTime" type="time" value="${esc(state.wakeSettings?.time||"06:30")}"></div><button class="btn btn-primary" onclick="saveWakeManager()">Нигоҳ доштан</button>`)}
 async function saveWakeManager(){const time=$("wakeTime").value;if(!time)return err("Вақтро интихоб кунед.");await setDoc(doc(db,"app_settings","wake_schedule"),{time,updatedAt:serverTimestamp(),updatedBy:uid()},{merge:true});closeModal();ok("Вақти бедоршавӣ нигоҳ дошта шуд.");}
-
+ 
 /* ---------- tea recipe menu ---------- */
 function teaPage(){
  $("content").innerHTML=`<div class="page-head"><div><h2>Менюи чойнӯшӣ</h2><p>Рецептҳои умумии чойнӯшӣ</p></div>${elevated()?'<button class="btn btn-primary" onclick="openAddTea()">+ Рецепти нав</button>':""}</div><div id="teaList" class="tea-grid"></div>`;
@@ -357,7 +357,7 @@ function openAddTea(){modal(`<h2>Рецепти нав</h2><div class="form-grou
 async function saveTea(){const name=$("teaName").value.trim();if(!name)return err("Номро ворид кунед.");await addDoc(collection(db,"tea_recipes"),{name,ingredients:$("teaIngredients").value.trim(),steps:$("teaSteps").value.trim(),createdBy:uid(),createdAt:serverTimestamp()});closeModal();ok("Рецепт илова шуд.")}
 function openTeaRecipe(id){const r=state.teaRecipes.find(x=>x.id===id);if(!r)return;modal(`<h2>🍵 ${esc(r.name)}</h2><h3>Маводҳо</h3><p>${esc(r.ingredients||"—").replaceAll("\n","<br>")}</p><h3>Тарзи тайёркунӣ</h3><p>${esc(r.steps||"—").replaceAll("\n","<br>")}</p>${elevated()?`<div class="action-row"><button class="btn btn-danger" onclick="deleteTea('${id}')">Нест кардан</button></div>`:""}`)}
 async function deleteTea(id){if(!confirm("Ин рецепт нест карда шавад?"))return;await deleteDoc(doc(db,"tea_recipes",id));closeModal();ok("Рецепт нест карда шуд.")}
-
+ 
 /* ---------- staff chat (manager + supervisors + head) ---------- */
 function chatPage(){
  if($("chatBox")){renderChat();return}
@@ -396,7 +396,7 @@ function renderChat(){
  box.scrollTop=box.scrollHeight;
 }
 async function sendChat(){const inp=$("chatInput"),v=inp.value.trim();if(!v)return;inp.value="";try{await addDoc(collection(db,"chat_messages"),{text:v,senderId:uid(),senderName:state.profile?.name||state.profile?.email,role:state.profile?.role,createdAt:serverTimestamp()});}catch(e){inp.value=v;err(e.message||"Паём фиристода нашуд.")}}
-
+ 
 /* ---------- supervisors (invite + promote to head) ---------- */
 function supervisorsPage(){
  if(!elevated()&&!isHead()){$("content").innerHTML=`<div class="section-card"><h2>Мураббӣ</h2><p>Ҳуҷраҳо: ${(state.profile.assignedRoomIds||[]).map(roomName).join(", ")||"—"}</p></div>`;return}
@@ -407,8 +407,20 @@ function openAddSupervisor(){modal(`<h2>Мураббии нав</h2><div class="
 async function createSupervisorInvitation(){const name=$("inviteName").value.trim(),email=$("inviteEmail").value.trim(),phone=$("invitePhone").value.trim(),rooms=[...document.querySelectorAll(".invite-room-checkbox:checked")].map(x=>x.value);if(!name||!email)return err("Ном ва email-ро пур кунед.");if(!rooms.length)return err("Ҳуҷра интихоб кунед.");const code=inviteCode();await setDoc(doc(db,"invitations",code),{name,email,phone,roomIds:rooms,role:"supervisor",status:"pending",createdBy:uid(),createdAt:serverTimestamp()});closeModal();modal(`<h2>Даъват сохта шуд ✅</h2><div class="invite-code">${code}</div><p>Email: <b>${esc(email)}</b></p><button class="btn btn-primary" onclick="closeModal()">Хуб</button>`)}
 async function toggleHeadRole(sid,newRole){await updateDoc(doc(db,"users",sid),{role:newRole});ok(newRole==="head"?"Ба сармураббӣ таъин шуд.":"Ба мураббии оддӣ баргардонида шуд.")}
 function openAssignSupervisor(roomId){modal(`<h2>Таъини мураббӣ</h2><select id="roomSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select><button class="btn btn-primary" onclick="assignSupervisorToRoom('${roomId}')">Сабт</button>`)}
-async function assignSupervisorToRoom(roomId){const sid=$("roomSupervisor").value;await updateDoc(doc(db,"rooms",roomId),{supervisorId:sid});const r=doc(db,"users",sid),s=await getDoc(r);if(s.exists())await updateDoc(r,{assignedRoomIds:[...new Set([...(s.data().assignedRoomIds||[]),roomId])]});closeModal();ok("Мураббӣ таъин шуд.")}
-
+async function assignSupervisorToRoom(roomId){
+ const sid=$("roomSupervisor").value;
+ const room=state.rooms.find(x=>x.id===roomId);
+ const oldSid=room?.supervisorId;
+ await updateDoc(doc(db,"rooms",roomId),{supervisorId:sid});
+ const r=doc(db,"users",sid),s=await getDoc(r);
+ if(s.exists())await updateDoc(r,{assignedRoomIds:[...new Set([...(s.data().assignedRoomIds||[]),roomId])]});
+ if(oldSid&&oldSid!==sid){
+  const or_=doc(db,"users",oldSid),os=await getDoc(or_);
+  if(os.exists())await updateDoc(or_,{assignedRoomIds:(os.data().assignedRoomIds||[]).filter(x=>x!==roomId)});
+ }
+ closeModal();ok("Мураббӣ таъин шуд.")
+}
+ 
 /* ---------- routing ---------- */
 function renderPage(){
  const t={dashboard:["Dashboard","Идоракунии хобгоҳ"],students:["Талабаҳо","Идоракунии талабаҳо"],rooms:["Ҳуҷраҳо","Ҷойҳои хоб"],attendance:["Давомот","Журнали ҳаррӯза"],violations:["Қоидавайронкунӣ","Назорати қоидаҳо"],cleanliness:["Озмуни тозагӣ","Арзёбии ҳуҷраҳо"],roster:["Навбатдорӣ","Навбатдории мураббиён"],tea:["Менюи чойнӯшӣ","Рецептҳои умумӣ"],chat:["Чат","Барои роҳбарият ва мураббиён"],supervisors:["Мураббиён","Идоракунии мураббиён"]};
@@ -416,7 +428,7 @@ function renderPage(){
  document.querySelectorAll("#nav [data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===state.page));
  ({dashboard:dashboardPage,students:studentsPage,rooms:roomsPage,attendance:attendancePage,violations:violationsPage,cleanliness:cleanlinessPage,roster:rosterPage,tea:teaPage,chat:chatPage,supervisors:supervisorsPage}[state.page]||dashboardPage)();
 }
-
+ 
 onAuthStateChanged(auth,async user=>{
  if(!user){clearListeners();state.user=null;state.profile=null;renderLogin();return}
  try{
@@ -425,9 +437,9 @@ onAuthStateChanged(auth,async user=>{
   shell();await seedRooms();startListening();requestNotifications();ensureActiveDutyLog().catch(e=>console.warn(e));renderPage();
  }catch(e){console.error(e);err(e.message);await signOut(auth);renderLogin()}
 });
-
+ 
 if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(e=>console.warn("SW registration failed:",e))})}
-
+ 
 Object.assign(window,{login,logout,renderLogin,renderSupervisorRegistration,registerSupervisor,closeModal,
  openAddStudent,createStudent,openStudent,openEditStudent,updateStudent,deleteStudent,openTransferStudent,confirmTransfer,removeFromRoom,renderStudentRows,
  openRoom,renderRoomCards,openAddRoom,saveNewRoom,openEditRoom,updateRoom,deleteRoom,openAssignStudent,assignStudent,
