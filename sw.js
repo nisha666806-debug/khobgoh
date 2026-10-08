@@ -1,4 +1,4 @@
-const CACHE = "khobgoh-v6-permission-fix";
+const CACHE = "khobgoh-v7-icons";
 const SHELL = [
   "./",
   "./index.html",
@@ -6,6 +6,8 @@ const SHELL = [
   "./js/app.js",
   "./js/firebase.js",
   "./assets/dormitory-logo.png",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
   "./manifest.json"
 ];
 

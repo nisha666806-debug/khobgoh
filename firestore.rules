@@ -45,10 +45,11 @@ service cloud.firestore {
           && request.resource.data.inviteCode is string
           && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.email == request.auth.token.email
           && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.status == "pending"
+          && request.resource.data.assignedRoomIds == get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.roomIds
         );
 
-      // Manager and head have full administrative access
-      allow update, delete: if elevated();
+      // Manager has full administrative access
+      allow update, delete: if manager();
     }
 
     match /invitations/{inviteId} {
@@ -97,7 +98,7 @@ service cloud.firestore {
               && request.resource.data.place == null)
           ));
 
-      allow delete: if elevated();
+      allow delete: if manager();
     }
 
     match /rooms/{roomId} {
@@ -195,21 +196,25 @@ service cloud.firestore {
 
     match /duty_logs/{logId} {
       allow read: if elevated() || (supervisor() && resource.data.userId == request.auth.uid);
-      allow create: if staff() && (elevated() || request.resource.data.userId == request.auth.uid);
-      allow update: if elevated() || (supervisor() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid);
+      allow create: if staff() && (elevated() || request.resource.data.userId == request.auth.uid)
+        && request.resource.data.createdAt == request.time;
+      allow update: if elevated() || (supervisor() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid)
+        && request.resource.data.createdAt == request.time;
       allow delete: if elevated();
     }
 
     match /wake_confirmations/{confirmationId} {
       allow read: if elevated() || (staff() && resource.data.userId == request.auth.uid);
-      allow create, update: if staff() && request.resource.data.userId == request.auth.uid;
+      allow create, update: if staff() && request.resource.data.userId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
       allow delete: if elevated();
     }
 
     // internal staff chat (manager + head + supervisors only)
     match /chat_messages/{messageId} {
       allow read: if staff();
-      allow create: if staff() && request.resource.data.senderId == request.auth.uid;
+      allow create: if staff() && request.resource.data.senderId == request.auth.uid
+        && (request.resource.data.senderName == myUser().data.name || request.resource.data.senderName == myUser().data.email);
       allow update, delete: if false;
     }
   }
