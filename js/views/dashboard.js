@@ -9,20 +9,6 @@ export function renderDashboard() {
 
   return `
     <div class="page-container">
-      <!-- PWA Install Banner if applicable -->
-      <div id="pwa-install-banner" class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--emerald-800) 0%, var(--emerald-900) 100%); color:#fff; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; padding:16px 20px;">
-        <div style="display:flex; align-items:center; gap:14px;">
-          <img src="assets/dormitory-logo.png" style="width:40px; height:40px; border-radius:10px; background:#fff; padding:3px;">
-          <div>
-            <div style="font-weight:800; font-size:15px;">Барномаи «Хобгоҳ»-ро дар экрани худ насб кунед</div>
-            <div style="font-size:12px; color:rgba(255,255,255,0.8);">Дастрасии фаврӣ, бехато ва офлайн дар телефон ва компютер</div>
-          </div>
-        </div>
-        <button class="btn btn-secondary btn-sm" style="font-weight:700; background:#fff; color:var(--emerald-900);" onclick="window.khobgoh.promptPWAInstall()">
-          ${t('install_pwa')}
-        </button>
-      </div>
-
       <!-- Supervisor on duty alert banner -->
       <div class="card" style="margin-bottom:20px; border-left:5px solid var(--emerald-500); background:var(--emerald-50); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div style="display:flex; align-items:center; gap:12px;">

@@ -50,11 +50,11 @@ export function renderSettings() {
         </div>
       </div>
 
-      <!-- Preferences: Lang & Theme & PWA -->
+      <!-- Preferences: Lang & Theme -->
       <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:700;">⚙️ Танзимоти намуди зоҳирӣ ва насб</h3>
+        <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:700;">⚙️ Танзимоти намуди зоҳирӣ</h3>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
           <div class="form-group">
             <label class="form-label">${t('settings_lang')}</label>
             <select class="form-control" onchange="window.khobgoh.changeLanguage(this.value)">
@@ -71,10 +71,6 @@ export function renderSettings() {
             </select>
           </div>
         </div>
-
-        <button class="btn btn-secondary" style="width:100%;" onclick="window.khobgoh.promptPWAInstall()">
-          ${t('install_pwa')}
-        </button>
       </div>
 
       <!-- Backup & Data Management -->
