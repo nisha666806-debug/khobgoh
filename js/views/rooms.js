@@ -21,9 +21,16 @@ export function renderRooms() {
       </div>
 
       <!-- Section 1: Student Rooms (8 beds) -->
-      <h2 style="font-size:18px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
-        👨‍🎓 ${t('rooms_student_rooms')}
-      </h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
+        <h2 style="font-size:18px; font-weight:700; margin:0; display:flex; align-items:center; gap:8px;">
+          👨‍🎓 ${t('rooms_student_rooms')}
+        </h2>
+        ${canManage ? `
+          <button class="btn btn-primary btn-sm" onclick="window.khobgoh.openAddCustomRoomModal()">
+            + Иловаи ҳуҷраи нав
+          </button>
+        ` : ''}
+      </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:18px; margin-bottom:32px;">
         ${studentRooms.map(room => {

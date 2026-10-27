@@ -1,4 +1,4 @@
-// Khobgoh Violations View v2.2
+// Khobgoh Violations View v2.4 (Without Severity / Бе дараҷа)
 import { store } from "../store.js";
 
 export function renderViolations() {
@@ -30,7 +30,6 @@ export function renderViolations() {
               <th>${t('viol_col_room')}</th>
               <th>${t('viol_col_reason')}</th>
               <th>Сабткунанда</th>
-              <th>${t('viol_col_severity')}</th>
               <th>${t('viol_col_status')}</th>
               <th style="text-align:right;">${t('students_col_actions')}</th>
             </tr>
@@ -38,12 +37,11 @@ export function renderViolations() {
           <tbody>
             ${violations.length === 0 ? `
               <tr>
-                <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
+                <td colspan="7" style="text-align:center; padding:32px; color:var(--text-muted);">
                   Ҳеҷ қоидавайронкунӣ сабт нашудааст. Интизом намунавӣ аст! ✨
                 </td>
               </tr>
             ` : violations.map(v => {
-              const severityColor = v.severity === 'high' ? '#ef4444' : v.severity === 'medium' ? '#f59e0b' : '#3b82f6';
               const isResolved = v.status === 'resolved';
 
               return `
@@ -51,13 +49,8 @@ export function renderViolations() {
                   <td style="font-family:var(--font-mono); font-size:13px;">${v.date}</td>
                   <td><strong>${v.studentName}</strong></td>
                   <td><span class="status-pill status-permission">Ҳуҷраи ${v.room}</span></td>
-                  <td style="max-width:320px;">${v.reason}</td>
+                  <td style="max-width:360px;">${v.reason}</td>
                   <td style="font-size:13px; color:var(--text-muted);">${v.reporter || 'Мураббӣ'}</td>
-                  <td>
-                    <span style="font-size:12px; font-weight:700; color:${severityColor};">
-                      ● ${t('viol_severity_' + v.severity)}
-                    </span>
-                  </td>
                   <td>
                     <span class="status-pill ${isResolved ? 'status-active' : 'status-absent'}">
                       ${t('viol_status_' + v.status)}

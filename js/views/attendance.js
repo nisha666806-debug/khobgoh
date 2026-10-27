@@ -76,7 +76,7 @@ export function renderAttendance() {
 
         ${absentStudents.length === 0 ? `
           <div style="font-size:13px; color:#15803d; font-weight:600; padding:8px 0;">
-            Ҳамаи донишҷӯён имрӯз дар хобгоҳ ҳузур доранд. Ҳеҷ кас ғоиб нест! 🎉
+            Ҳамаи талабагон имрӯз дар хобгоҳ ҳузур доранд. Ҳеҷ кас ғоиб нест! 🎉
           </div>
         ` : `
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
@@ -113,7 +113,7 @@ export function renderAttendance() {
             <div class="card" style="padding:16px 20px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
                 <h3 style="margin:0; font-size:16px; font-weight:700;">Ҳуҷраи ${roomId}</h3>
-                <span style="font-size:12px; color:var(--text-muted); font-weight:600;">${roomStudents.length} донишҷӯ</span>
+                <span style="font-size:12px; color:var(--text-muted); font-weight:600;">${roomStudents.length} талаба</span>
               </div>
 
               <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px;">

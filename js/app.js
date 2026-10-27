@@ -713,6 +713,58 @@ window.khobgoh = {
     });
   },
 
+  // Custom Room Modal
+  openAddCustomRoomModal() {
+    if (!store.canManageStudents()) return;
+    const body = `
+      <form id="addRoomForm" onsubmit="window.khobgoh.submitAddCustomRoom(event)">
+        <div class="form-group">
+          <label class="form-label">Рақами ҳуҷра (масалан: 108, 204, 301) *</label>
+          <input type="text" id="customRoomId" class="form-control" required placeholder="Рақами ҳуҷраро нависед...">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Иқтидор (Миқдори катҳо) *</label>
+            <input type="number" id="customRoomCap" min="1" max="24" value="8" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ошёна</label>
+            <input type="number" id="customRoomFloor" min="1" max="5" value="1" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Навъи ҳуҷра</label>
+          <select id="customRoomType" class="form-control">
+            <option value="student">Ҳуҷраи талабагон</option>
+            <option value="supervisor">Ҳуҷраи мураббиён</option>
+          </select>
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('addRoomForm').requestSubmit()">Сабт кардан</button>
+    `;
+
+    openModal("Илова ё танзими ҳуҷра", body, footer);
+  },
+
+  submitAddCustomRoom(e) {
+    e.preventDefault();
+    const id = document.getElementById("customRoomId")?.value.trim();
+    const cap = document.getElementById("customRoomCap")?.value;
+    const floor = document.getElementById("customRoomFloor")?.value;
+    const type = document.getElementById("customRoomType")?.value;
+
+    if (!id) return;
+    store.addCustomRoom(id, cap, floor, type);
+    closeModal();
+    showToast(`Ҳуҷраи ${id} бомуваффақият сабт шуд!`, "success");
+  },
+
   // Modals for Students
   openAddStudentModal() {
     if (!store.canManageStudents()) {
@@ -732,15 +784,16 @@ window.khobgoh = {
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
-            <label class="form-label">${t('students_col_room')} *</label>
-            <select id="newStdRoom" class="form-control" required>
-              ${rooms.map(r => `<option value="${r.id}">${r.name} (${r.capacity} ҷойӣ)</option>`).join('')}
-            </select>
+            <label class="form-label">${t('students_col_room')} (Муайянкунии озод) *</label>
+            <input type="text" id="newStdRoom" list="roomListOptions" class="form-control" required placeholder="Масалан: 101, 102, 205...">
+            <datalist id="roomListOptions">
+              ${rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+            </datalist>
           </div>
 
           <div class="form-group">
-            <label class="form-label">${t('students_col_bed')} (1-8) *</label>
-            <input type="number" id="newStdBed" min="1" max="8" value="1" class="form-control" required>
+            <label class="form-label">${t('students_col_bed')} (Ҷой) *</label>
+            <input type="number" id="newStdBed" min="1" max="20" value="1" class="form-control" required>
           </div>
         </div>
 
@@ -867,7 +920,7 @@ window.khobgoh = {
       <button class="btn btn-primary" onclick="window.khobgoh.saveStudentEdits('${s.id}')">Сабт кардан</button>
     `;
 
-    openModal("Таҳрири маълумоти донишҷӯ", body, footer);
+    openModal("Таҳрири маълумоти талаба", body, footer);
   },
 
   saveStudentEdits(id) {
@@ -891,7 +944,7 @@ window.khobgoh = {
       <div id="studentPassCard" style="border:2px solid var(--emerald-600); border-radius:var(--radius-lg); padding:20px; background:#fff; color:#0f172a; box-shadow:var(--shadow-md);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--emerald-600); padding-bottom:12px; margin-bottom:16px;">
           <div>
-            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--emerald-800);">КОРТИ ХОБГОҲИ ДОНИШҶӮ</h3>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--emerald-800);">КОРТИ ХОБГОҲИ ТАЛАБА</h3>
             <div style="font-size:11px; color:#64748b;">DORMITORY RESIDENT PASS</div>
           </div>
           <div style="font-family:var(--font-mono); font-weight:800; color:var(--emerald-700); font-size:14px;">${s.studentId}</div>
@@ -944,12 +997,12 @@ window.khobgoh = {
     renderApp();
   },
 
-  // Violations: ALL supervisors have access to ALL students (Requirement 9)
+  // Violations: ALL supervisors have access to ALL students (Requirement 9, No severity)
   openAddViolationModal() {
     const students = store.state.students;
     const body = `
       <div class="form-group">
-        <label class="form-label">Интихоби донишҷӯ (аз ҳамаи ҳуҷраҳо)</label>
+        <label class="form-label">Интихоби талаба (аз ҳамаи ҳуҷраҳо)</label>
         <select id="violStudentSelect" class="form-control">
           ${students.map(s => `<option value="${s.id}">${s.name} (Ҳуҷраи ${s.room}, Ҷойи №${s.bed} - ${s.course})</option>`).join('')}
         </select>
@@ -958,15 +1011,6 @@ window.khobgoh = {
       <div class="form-group">
         <label class="form-label">Сабаб ё шарҳи ҳодиса</label>
         <textarea id="violReason" class="form-control" placeholder="Масалан: Дер омадан ба хобгоҳ, вайрон кардани интизом..."></textarea>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Дараҷаи ҷиддият (Severity)</label>
-        <select id="violSeverity" class="form-control">
-          <option value="low">Огоҳӣ (Low)</option>
-          <option value="medium">Миёна (Medium)</option>
-          <option value="high">Ҷиддӣ (High)</option>
-        </select>
       </div>
     `;
 
@@ -981,7 +1025,6 @@ window.khobgoh = {
   submitViolation() {
     const studentId = document.getElementById("violStudentSelect")?.value;
     const reason = document.getElementById("violReason")?.value.trim();
-    const severity = document.getElementById("violSeverity")?.value;
 
     const student = store.state.students.find(s => s.id === studentId);
     if (!student || !reason) return;
@@ -990,8 +1033,7 @@ window.khobgoh = {
       studentId,
       studentName: student.name,
       room: student.room,
-      reason,
-      severity
+      reason
     });
 
     closeModal();

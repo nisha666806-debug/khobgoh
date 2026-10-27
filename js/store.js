@@ -136,12 +136,24 @@ class Store {
     }
 
     const id = "std_" + Date.now();
+    const roomNum = String(student.room || "101").trim();
+    // Auto-create room if not exists
+    if (!this.state.rooms.some(r => r.id === roomNum)) {
+      this.state.rooms.push({
+        id: roomNum,
+        name: `Ҳуҷраи ${roomNum}`,
+        floor: parseInt(roomNum[0]) || 1,
+        type: "student",
+        capacity: 8
+      });
+    }
+
     const newStudent = {
       id,
       studentId: student.studentId || `KH-${Date.now().toString().slice(-4)}`,
       name: student.name,
-      room: student.room,
-      bed: Number(student.bed),
+      room: roomNum,
+      bed: Number(student.bed || 1),
       course: student.course || "Синфи 10",
       phone: student.phone || "",
       admissionDate: student.admissionDate || new Date().toISOString().split("T")[0],
@@ -163,6 +175,26 @@ class Store {
       throw new Error("Танҳо Мудир ё Сармураббӣ метавонанд донишҷӯро хориҷ кунанд.");
     }
     this.state.students = this.state.students.filter(s => s.id !== id);
+    this.saveState();
+  }
+
+  // Add or configure custom room
+  addCustomRoom(id, capacity = 8, floor = 1, type = "student") {
+    const roomId = String(id).trim();
+    const existing = this.state.rooms.find(r => r.id === roomId);
+    if (existing) {
+      existing.capacity = Number(capacity);
+      existing.floor = Number(floor);
+      existing.type = type;
+    } else {
+      this.state.rooms.push({
+        id: roomId,
+        name: type === "supervisor" ? `Мураббиён ${roomId}` : `Ҳуҷраи ${roomId}`,
+        floor: Number(floor) || (parseInt(roomId[0]) || 1),
+        type,
+        capacity: Number(capacity)
+      });
+    }
     this.saveState();
   }
 

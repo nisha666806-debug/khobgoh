@@ -1,4 +1,4 @@
-// Khobgoh Translations dictionary (Tajik & English)
+// Khobgoh Translations dictionary (Tajik & English) v2.4
 export const translations = {
   tg: {
     brand_title: "Хобгоҳ",
@@ -6,11 +6,11 @@ export const translations = {
     role_manager: "Мудир (Админ)",
     role_head: "Сармураббӣ",
     role_supervisor: "Мураббӣ",
-    role_student: "Талаба / Донишҷӯ",
+    role_student: "Талаба",
 
     // Nav
     nav_dashboard: "Панели асосӣ",
-    nav_students: "Донишҷӯён",
+    nav_students: "Талабагон",
     nav_rooms: "Ҳуҷраҳо",
     nav_attendance: "Давомот",
     nav_activities: "Ҷадвали фаъолиятҳо",
@@ -21,7 +21,7 @@ export const translations = {
     nav_settings: "Танзимот",
 
     // Dashboard
-    dash_total_students: "Ҳамаи донишҷӯён",
+    dash_total_students: "Ҳамаи талабагон",
     dash_occupancy: "Ҷойҳои бандшуда",
     dash_vacant_beds: "Ҷойҳои холӣ",
     dash_attendance_today: "Давомоти имрӯз",
@@ -29,12 +29,12 @@ export const translations = {
     dash_quick_actions: "Амалҳои фаврӣ",
     dash_weekly_attendance: "Омори давомоти ҳафтаина",
     dash_recent_activity: "Ҳаракатҳои охирин",
-    dash_btn_add_student: "Иловаи донишҷӯ",
+    dash_btn_add_student: "Иловаи талаба",
     dash_btn_mark_attendance: "Сабти давомот",
     dash_btn_report_violation: "Сабти қоидавайронкунӣ",
 
-    // Students
-    students_title: "Рӯйхати донишҷӯён",
+    // Students / Residents (Талабагон)
+    students_title: "Рӯйхати талабагон",
     students_subtitle: "Идоракунии истиқоматкунандагон ва сабти ҷойҳо",
     students_search: "Ҷустуҷӯ аз рӯи ном ё ID...",
     students_filter_room: "Ҳамаи ҳуҷраҳо",
@@ -42,7 +42,7 @@ export const translations = {
     students_col_name: "Ному насаб",
     students_col_room: "Ҳуҷра",
     students_col_bed: "Ҷой",
-    students_col_course: "Курс / Синф",
+    students_col_course: "Синф / Гурӯҳ",
     students_col_phone: "Телефон",
     students_col_status: "Ҳолат",
     students_col_actions: "Амалҳо",
@@ -50,14 +50,14 @@ export const translations = {
     students_status_absent: "Ғоиб",
     students_status_transferred: "Кӯчида",
     students_status_removed: "Хориҷшуда",
-    students_btn_add: "+ Донишҷӯи нав",
-    students_btn_print_id: "Корти донишҷӯ",
+    students_btn_add: "+ Талабаи нав",
+    students_btn_print_id: "Корти талаба",
 
     // Rooms
     rooms_title: "Ҳуҷраҳо ва катҳо",
     rooms_subtitle: "Харитаи ҷойгиршавӣ, сардорони ҳуҷра ва мураббиён",
-    rooms_student_rooms: "Ҳуҷраҳои донишҷӯён (8 ҷойӣ)",
-    rooms_supervisor_rooms: "Ҳуҷраҳои мураббиён (4 ҷойӣ)",
+    rooms_student_rooms: "Ҳуҷраҳои талабагон",
+    rooms_supervisor_rooms: "Ҳуҷраҳои мураббиён",
     rooms_bed: "Ҷой",
     rooms_vacant: "Холӣ",
     rooms_btn_assign: "Таъин кардани ҷой",
@@ -74,15 +74,15 @@ export const translations = {
 
     // Attendance
     att_title: "Давомоти ҳаррӯза",
-    att_subtitle: "Санҷиш ва сабти ҳузури донишҷӯён дар хобгоҳ",
+    att_subtitle: "Санҷиш ва сабти ҳузури талабагон дар хобгоҳ",
     att_date: "Сана",
     att_btn_all_present: "Ҳама ҳастанд",
     att_btn_export: "Боргирии ҳисобот",
     att_present: "Ҳаст (Ҳозир)",
     att_absent: "Нест (Ғоиб)",
-    att_absent_list_title: "⚠️ Донишҷӯёне, ки имрӯз дар хобгоҳ нестанд:",
+    att_absent_list_title: "⚠️ Талабаҳое, ки имрӯз дар хобгоҳ нестанд:",
 
-    // Violations
+    // Violations (бидуни дараҷа)
     viol_title: "Қоидавайронкунӣ ва интизом",
     viol_subtitle: "Баҳисобгирии огоҳиномаҳо ва чораҳои интизомӣ",
     viol_btn_add: "+ Сабти қоидавайронкунӣ",
@@ -90,11 +90,7 @@ export const translations = {
     viol_col_room: "Ҳуҷра",
     viol_col_date: "Сана",
     viol_col_reason: "Сабаб / Санад",
-    viol_col_severity: "Дараҷа",
     viol_col_status: "Ҳолат",
-    viol_severity_low: "Огоҳӣ",
-    viol_severity_medium: "Миёна",
-    viol_severity_high: "Ҷиддӣ",
     viol_status_pending: "Баррасишаванда",
     viol_status_resolved: "Ҳалшуда",
 
@@ -148,8 +144,7 @@ export const translations = {
     close: "Пӯшидан",
     confirm: "Тасдиқ",
     success_saved: "Бо муваффақият сабт шуд!",
-    logout: "Баромадан",
-    install_pwa: "📲 Насб кардан дар экран"
+    logout: "Баромадан"
   },
   en: {
     brand_title: "Khobgoh",
@@ -157,11 +152,11 @@ export const translations = {
     role_manager: "Manager (Admin)",
     role_head: "Head Supervisor",
     role_supervisor: "Supervisor",
-    role_student: "Student / Resident",
+    role_student: "Student",
 
     // Nav
     nav_dashboard: "Dashboard",
-    nav_students: "Residents",
+    nav_students: "Students",
     nav_rooms: "Rooms & Beds",
     nav_attendance: "Attendance",
     nav_activities: "Activities Matrix",
@@ -172,7 +167,7 @@ export const translations = {
     nav_settings: "Settings",
 
     // Dashboard
-    dash_total_students: "Total Residents",
+    dash_total_students: "Total Students",
     dash_occupancy: "Occupied Beds",
     dash_vacant_beds: "Vacant Beds",
     dash_attendance_today: "Today's Attendance",
@@ -180,12 +175,12 @@ export const translations = {
     dash_quick_actions: "Quick Actions",
     dash_weekly_attendance: "Weekly Attendance Overview",
     dash_recent_activity: "Recent Activity Log",
-    dash_btn_add_student: "New Resident",
+    dash_btn_add_student: "New Student",
     dash_btn_mark_attendance: "Take Attendance",
     dash_btn_report_violation: "Report Infraction",
 
     // Students
-    students_title: "Resident Directory",
+    students_title: "Students Directory",
     students_subtitle: "Manage room assignments, student records, and status",
     students_search: "Search by name or ID...",
     students_filter_room: "All Rooms",
@@ -201,14 +196,14 @@ export const translations = {
     students_status_absent: "Absent",
     students_status_transferred: "Transferred",
     students_status_removed: "Withdrawn",
-    students_btn_add: "+ New Resident",
+    students_btn_add: "+ New Student",
     students_btn_print_id: "Print ID Pass",
 
     // Rooms
     rooms_title: "Rooms & Bed Layout",
     rooms_subtitle: "Interactive visual bed occupancy map, supervisors and leaders",
-    rooms_student_rooms: "Student Dormitories (8 beds each)",
-    rooms_supervisor_rooms: "Supervisor Quarters (4 beds each)",
+    rooms_student_rooms: "Student Dormitories",
+    rooms_supervisor_rooms: "Supervisor Quarters",
     rooms_bed: "Bed",
     rooms_vacant: "Vacant",
     rooms_btn_assign: "Assign Bed",
@@ -225,27 +220,23 @@ export const translations = {
 
     // Attendance
     att_title: "Daily Attendance Sheet",
-    att_subtitle: "Verification of present and absent residents",
+    att_subtitle: "Verification of present and absent students",
     att_date: "Date",
     att_btn_all_present: "Mark All Present",
     att_btn_export: "Export Log",
     att_present: "Present",
     att_absent: "Absent",
-    att_absent_list_title: "⚠️ Residents absent from dormitory today:",
+    att_absent_list_title: "⚠️ Students absent from dormitory today:",
 
     // Violations
     viol_title: "Discipline & Violations",
     viol_subtitle: "Track conduct notices and disciplinary measures",
     viol_btn_add: "+ Report Infraction",
-    viol_col_student: "Resident",
+    viol_col_student: "Student",
     viol_col_room: "Room",
     viol_col_date: "Date",
     viol_col_reason: "Reason / Incident",
-    viol_col_severity: "Severity",
     viol_col_status: "Status",
-    viol_severity_low: "Warning",
-    viol_severity_medium: "Moderate",
-    viol_severity_high: "Severe",
     viol_status_pending: "Pending",
     viol_status_resolved: "Resolved",
 
@@ -299,7 +290,6 @@ export const translations = {
     close: "Close",
     confirm: "Confirm",
     success_saved: "Successfully saved!",
-    logout: "Log Out",
-    install_pwa: "📲 Install on Home Screen"
+    logout: "Log Out"
   }
 };

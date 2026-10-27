@@ -27,7 +27,7 @@ export function renderDashboard() {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:16px;">
         <div>
           <h1 style="font-size:24px; font-weight:800; margin:0 0 4px 0; color:var(--text-main);">${t('nav_dashboard')}</h1>
-          <p style="margin:0; color:var(--text-muted); font-size:14px;">Идоракунии муосири хобгоҳ ва назорати донишҷӯён</p>
+          <p style="margin:0; color:var(--text-muted); font-size:14px;">Идоракунии муосири хобгоҳ ва назорати талабагон</p>
         </div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.navigate('attendance')">
@@ -44,7 +44,7 @@ export function renderDashboard() {
       <!-- KPI Stat Cards (Clickable navigation) -->
       <div class="stats-grid">
         <!-- Card 1: Students (Click goes directly to Students page) -->
-        <div class="stat-card card-hover" style="cursor:pointer;" onclick="window.khobgoh.navigate('students')" title="Пахш кунед барои гузаштан ба бахши донишҷӯён">
+        <div class="stat-card card-hover" style="cursor:pointer;" onclick="window.khobgoh.navigate('students')" title="Пахш кунед барои гузаштан ба бахши талабагон">
           <div class="stat-icon" style="background:#ecfdf5; color:#059669;">
             <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>

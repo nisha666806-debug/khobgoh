@@ -19,7 +19,7 @@ export function renderStudents() {
             ${t('students_btn_add')}
           </button>
         ` : `
-          <span class="status-pill status-permission" style="font-size:12px;">Иловаи донишҷӯ: Танҳо Мудир ва Сармураббӣ</span>
+          <span class="status-pill status-permission" style="font-size:12px;">Иловаи талаба: Танҳо Мудир ва Сармураббӣ</span>
         `}
       </div>
 
@@ -91,7 +91,7 @@ export function renderStudents() {
                   </td>
                   <td style="text-align:right;">
                     <div style="display:inline-flex; gap:6px;">
-                      <button class="btn btn-secondary btn-sm" title="Дидани корти донишҷӯӣ" onclick="window.khobgoh.viewStudentPass('${s.id}')">🪪 ID</button>
+                      <button class="btn btn-secondary btn-sm" title="Дидани корти талаба" onclick="window.khobgoh.viewStudentPass('${s.id}')">🪪 ID</button>
                       ${canAdd ? `
                         <button class="btn btn-secondary btn-sm" title="Таҳрир" onclick="window.khobgoh.editStudent('${s.id}')">✏️</button>
                         <button class="btn btn-danger btn-sm" title="Нобуд кардан" onclick="window.khobgoh.deleteStudent('${s.id}')">🗑️</button>
