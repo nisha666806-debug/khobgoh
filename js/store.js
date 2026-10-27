@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v3_0";
+const STORAGE_KEY = "khobgoh_state_v3_1";
 
 class Store {
   constructor() {

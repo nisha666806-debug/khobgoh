@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Хобгоҳ">
   <meta name="application-name" content="Хобгоҳ">
 
-  <link rel="stylesheet" href="css/main.css?v=3.0">
+  <link rel="stylesheet" href="css/main.css?v=3.1">
 
   <script>
     // Fail-safe error boundary for blank screen prevention
@@ -48,6 +48,9 @@
     });
 
     window.khobgohForceReload = function() {
+      try {
+        localStorage.clear();
+      } catch (e) {}
       if ('caches' in window) {
         caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => {
           if ('serviceWorker' in navigator) {
@@ -85,13 +88,13 @@
   <div id="toast-container"></div>
 
   <!-- Core App ES Module -->
-  <script type="module" src="js/app.js?v=3.0"></script>
+  <script type="module" src="js/app.js?v=3.1"></script>
 
   <!-- Service Worker registration for PWA & Offline reliability -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=3.0')
+        navigator.serviceWorker.register('sw.js?v=3.1')
           .then(reg => {
             reg.update();
             console.log('Khobgoh PWA ServiceWorker active:', reg.scope);

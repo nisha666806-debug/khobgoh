@@ -100,22 +100,22 @@ export function renderDashboard() {
           </div>
           <div style="display:flex; align-items:center; gap:16px; padding:16px; background:var(--surface-muted); border-radius:var(--radius-md); margin-bottom:16px;">
             <div style="width:50px; height:50px; border-radius:50%; background:var(--emerald-600); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;">
-              ${todayRoster.supervisorName.split(' ')[0][0]}
+              ${(todayRoster?.supervisorName || 'Мураббӣ').split(' ')[0][0] || 'М'}
             </div>
             <div>
-              <div style="font-weight:700; font-size:16px;">${todayRoster.supervisorName}</div>
-              <div style="font-size:13px; color:var(--text-muted);">${todayRoster.phone}</div>
+              <div style="font-weight:700; font-size:16px;">${todayRoster?.supervisorName || 'Мураббӣ'}</div>
+              <div style="font-size:13px; color:var(--text-muted);">${todayRoster?.phone || '—'}</div>
             </div>
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div style="padding:12px; background:var(--surface-muted); border-radius:var(--radius-sm); text-align:center;">
-              <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">Навбатдори чой</div>
-              <div style="font-weight:700; font-size:13px; color:var(--text-main);">${store.state.tea.todayDuty.split('(')[0]}</div>
+            <div style="padding:12px; background:var(--surface-muted); border-radius:var(--radius-sm); text-align:center; cursor:pointer;" onclick="window.khobgoh.navigate('tea')" title="Кушодани ҷадвали чойнӯшӣ">
+              <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">Ҷадвали чойнӯшӣ</div>
+              <div style="font-weight:700; font-size:13px; color:var(--emerald-700);">5 синф (7-11) 🍵</div>
             </div>
-            <div style="padding:12px; background:var(--surface-muted); border-radius:var(--radius-sm); text-align:center;">
-              <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">Ҳолати самовор</div>
-              <div style="font-weight:700; font-size:13px; color:#10b981;">⚡️ Фаъол</div>
+            <div style="padding:12px; background:var(--surface-muted); border-radius:var(--radius-sm); text-align:center; cursor:pointer;" onclick="window.khobgoh.navigate('tea')" title="Ресептҳои чойи хобгоҳ">
+              <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">Ресептҳои чой</div>
+              <div style="font-weight:700; font-size:13px; color:var(--emerald-700);">${(store.state.tea?.recipes || []).length} намуд 🌿</div>
             </div>
           </div>
         </div>
