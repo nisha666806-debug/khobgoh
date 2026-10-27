@@ -846,18 +846,6 @@ window.khobgoh = {
 
     openModal("Таъин кардани мураббӣ ба ҳуҷра", body, footer);
   },
-          <input type="number" id="assignSupBed" min="1" max="4" value="1" class="form-control">
-        </div>
-      </div>
-    `;
-
-    const footer = `
-      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
-      <button class="btn btn-primary" onclick="window.khobgoh.submitAssignSupervisor()">Таъин кардан</button>
-    `;
-
-    openModal("Таъин кардани мураббӣ ба ҳуҷра", body, footer);
-  },
 
   submitAssignSupervisor() {
     const supId = document.getElementById("assignSupSelect")?.value;
