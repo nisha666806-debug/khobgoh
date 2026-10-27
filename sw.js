@@ -1,43 +1,49 @@
-const CACHE = "khobgoh-v7-icons";
-const SHELL = [
+// Khobgoh Modern Service Worker v2.2
+const CACHE_NAME = "khobgoh-pwa-v2.2";
+const ASSETS = [
   "./",
   "./index.html",
-  "./css/style.css",
+  "./manifest.json",
+  "./css/main.css",
   "./js/app.js",
-  "./js/firebase.js",
+  "./js/store.js",
+  "./js/data.js",
+  "./js/translations.js",
+  "./js/views/dashboard.js",
+  "./js/views/students.js",
+  "./js/views/rooms.js",
+  "./js/views/attendance.js",
+  "./js/views/activities.js",
+  "./js/views/violations.js",
+  "./js/views/cleanliness.js",
+  "./js/views/roster.js",
+  "./js/views/tea.js",
+  "./js/views/settings.js",
   "./assets/dormitory-logo.png",
   "./assets/icon-192.png",
-  "./assets/icon-512.png",
-  "./manifest.json"
+  "./assets/icon-512.png"
 ];
 
-self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", e => {
+self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    }).then(() => self.skipWaiting())
   );
-  self.clients.claim();
 });
 
-// Cache-first for same-origin app-shell files only.
-// Everything else (Firebase Auth/Firestore, Google Fonts, Chart.js CDN) goes straight to the network.
-self.addEventListener("fetch", e => {
-  const url = new URL(e.request.url);
-  if (url.origin !== self.location.origin || e.request.method !== "GET") return;
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
+    ).then(() => self.clients.claim())
+  );
+});
 
+self.addEventListener("fetch", (e) => {
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const network = fetch(e.request)
-        .then(res => {
-          if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
+    caches.match(e.request).then((res) => {
+      return res || fetch(e.request).catch(() => caches.match("./index.html"));
     })
   );
 });

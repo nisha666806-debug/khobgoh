@@ -1,530 +1,933 @@
-import{auth,db,registrationAuth,registrationDb,onAuthStateChanged,signInWithEmailAndPassword,signOut,createUserWithEmailAndPassword,collection,doc,getDoc,getDocs,setDoc,addDoc,updateDoc,deleteDoc,query,where,orderBy,limit,serverTimestamp,runTransaction,writeBatch,onSnapshot}from"./firebase.js";
- 
-const state={page:"dashboard",user:null,profile:null,students:[],rooms:[],supervisors:[],placements:[],residences:[],attendance:[],violations:[],cleanliness:[],teaRecipes:[],roster:[],activities:[],stageConfirms:[],stages:null,chat:[],dailySchedule:[],dutyLogs:[],wakeConfirms:[],wakeSettings:null,unsubs:[],_dutyNotified:false,_activityNotified:new Set()};
-const $=id=>document.getElementById(id),uid=()=>auth.currentUser?.uid||"";
-const isManager=()=>state.profile?.role==="manager",isHead=()=>state.profile?.role==="head",elevated=()=>isManager()||isHead();
-const esc=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-const jsStr=v=>String(v??"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-const roomName=id=>state.rooms.find(r=>String(r.id)===String(id))?.name||"—";
-const studentName=id=>state.students.find(s=>s.id===id)?.name||"—";
-const supervisorName=id=>state.supervisors.find(s=>s.id===id)?.name||"—";
-const currentResidence=id=>state.residences.find(r=>r.studentId===id&&!r.endDate)||null;
-const residenceHistory=id=>state.residences.filter(r=>r.studentId===id).sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||"")));
-const cap=r=>Number(r?.capacity||(r?.type==="supervisor"?4:8));
-const roleLabel=r=>({manager:"Manager",head:"Сармураббӣ",supervisor:"Мураббӣ"})[r]||r||"—";
-const DAY_KEYS=["sun","mon","tue","wed","thu","fri","sat"];
-const DAY_LABELS={mon:"Душанбе",tue:"Сешанбе",wed:"Чоршанбе",thu:"Панҷшанбе",fri:"Ҷумъа",sat:"Шанбе",sun:"Якшанбе"};
-const DEFAULT_STAGES=[{key:"start",label:"Кор оғоз шуд"},{key:"study",label:"Дарс тайёркунӣ оғоз шуд"},{key:"break",label:"Танаффус"},{key:"end",label:"Кор анҷом ёфт"}];
-function closeModal(){$("modal")?.classList.add("hidden")}
-function modal(h){$("modalContent").innerHTML=h;$("modal").classList.remove("hidden")}
-function inviteCode(){const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",r=new Uint32Array(8);crypto.getRandomValues(r);let x="KHG-";for(let i=0;i<8;i++)x+=c[r[i]%c.length];return x}
-function date(v){if(!v)return"—";const d=v?.toDate?v.toDate():new Date(v);return isNaN(d)?"—":d.toLocaleDateString("tg-TJ")}
-/* status()/att() return HTML-safe strings: unknown values coming from the DB are escaped (XSS fix) */
-function status(s){return esc(({Active:"Фаъол","Temporarily absent":"Ғоиб",Transferred:"Гузаронида шуд",Removed:"Хориҷшуда"})[s]||s||"—")}
-function att(s){return esc(({present:"Ҳозир",absent:"Ғоиб",permission:"Иҷозат",sick:"Бемор"})[s]||s||"—")}
-/* local date (YYYY-MM-DD). toISOString() is UTC and returned yesterday's date before 05:00 in Tajikistan (UTC+5) */
-function localDateStr(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function todayStr(){return localDateStr(new Date())}
-function monthsAgoStr(n){const d=new Date();d.setMonth(d.getMonth()-n,1);return localDateStr(d)}
-/* milliseconds from Firestore Timestamp / ISO string / null */
-function toMs(v){if(!v)return 0;if(v.toMillis)return v.toMillis();const t=new Date(v).getTime();return isNaN(t)?0:t}
-/* attribute-safe JS string literal for inline onclick handlers */
-const attrStr=v=>esc(jsStr(v));
-/* bed lock id used to make place assignment atomic */
-const bedLockId=(rid,p)=>`${rid}_${p}`;
-/* is the bed really taken? lock doc gives atomicity, local state filters out stale locks */
-function bedTaken(lockSnap,rid,p,sid){
- if(state.students.some(s=>s.id!==sid&&s.status==="Active"&&s.roomId===rid&&Number(s.place)===p))return true;
- if(!lockSnap?.exists())return false;
- const owner=lockSnap.data().studentId;if(!owner||owner===sid)return false;
- const o=state.students.find(s=>s.id===owner);
- if(!o)return true; // just assigned by someone else and not synced yet
- return o.status==="Active"&&o.roomId===rid&&Number(o.place)===p;
+// Khobgoh Main Application Controller v2.2
+import { store } from "./store.js";
+import { renderDashboard } from "./views/dashboard.js";
+import { renderStudents } from "./views/students.js";
+import { renderRooms } from "./views/rooms.js";
+import { renderAttendance } from "./views/attendance.js";
+import { renderActivities } from "./views/activities.js";
+import { renderViolations } from "./views/violations.js";
+import { renderCleanliness } from "./views/cleanliness.js";
+import { renderRoster } from "./views/roster.js";
+import { renderTea } from "./views/tea.js";
+import { renderSettings } from "./views/settings.js";
+
+// Toast notifications
+export function showToast(message, type = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+    <span>${message}</span>
+  `;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(20px)";
+    toast.style.transition = "all 0.25s ease";
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
 }
-function todayKey(){return DAY_KEYS[new Date().getDay()]}
- 
-/* ---------- toast notifications ---------- */
-function toast(msg,type="info"){
-  let wrap=$("toastWrap");
-  if(!wrap){wrap=document.createElement("div");wrap.id="toastWrap";wrap.className="toast-wrap";document.body.appendChild(wrap)}
-  const t=document.createElement("div");t.className=`toast toast-${type}`;t.textContent=msg;wrap.appendChild(t);
-  requestAnimationFrame(()=>t.classList.add("show"));
-  setTimeout(()=>{t.classList.remove("show");setTimeout(()=>t.remove(),250)},3600);
+
+// Modal helper: Closes smoothly when clicking the backdrop
+export function openModal(title, bodyHtml, footerHtml = "") {
+  const backdrop = document.getElementById("modal-backdrop");
+  const modalTitle = document.getElementById("modal-title");
+  const modalBody = document.getElementById("modal-body");
+  const modalFooter = document.getElementById("modal-footer");
+
+  if (!backdrop) return;
+
+  modalTitle.textContent = title;
+  modalBody.innerHTML = bodyHtml;
+  modalFooter.innerHTML = footerHtml;
+  backdrop.style.display = "flex";
 }
-const ok=m=>toast(m,"ok"),err=m=>toast(m,"err");
-function setLoading(v){document.body.classList.toggle("is-loading",v)}
- 
-/* ---------- login / registration ---------- */
-function renderLogin(){document.body.innerHTML=`<div class="login-page"><div class="login-card"><div class="login-logo"><img src="assets/dormitory-logo.png"></div><h1>Dormitory</h1><p class="login-subtitle">Системаи идоракунии хобгоҳ</p><div class="form-group"><label>Email</label><input id="loginEmail" type="email"></div><div class="form-group"><label>Парол</label><input id="loginPassword" type="password"></div><button class="btn btn-primary" onclick="login()">Ворид шудан</button><div class="register-link">Мураббӣ ҳастед? <button onclick="renderSupervisorRegistration()">Бақайдгирӣ</button></div></div></div>`}
-async function login(){const e=$("loginEmail")?.value.trim(),p=$("loginPassword")?.value;if(!e||!p)return err("Email ва паролро ворид кунед.");try{await signInWithEmailAndPassword(auth,e,p)}catch(e){console.error(e);err("Email ё парол нодуруст аст.")}}
-async function logout(){await signOut(auth)}
-function renderSupervisorRegistration(){document.body.innerHTML=`<div class="login-page"><div class="login-card"><div class="login-logo"><img src="assets/dormitory-logo.png"></div><h1>Бақайдгирии мураббӣ</h1><p class="login-subtitle">Коди даъватро аз роҳбар гиред.</p><div class="form-group"><label>Email</label><input id="registerEmail" type="email"></div><div class="form-group"><label>Коди даъват</label><input id="registerInviteCode" placeholder="KHG-XXXXXXXX"></div><div class="form-group"><label>Парол</label><input id="registerPassword" type="password"></div><div class="form-group"><label>Такрори парол</label><input id="registerPassword2" type="password"></div><button class="btn btn-primary" onclick="registerSupervisor()">Бақайдгирӣ</button><button class="btn btn-secondary" onclick="renderLogin()">← Бозгашт</button></div></div>`}
-async function registerSupervisor(){
- const email=$("registerEmail").value.trim().toLowerCase(),code=$("registerInviteCode").value.trim().toUpperCase(),p=$("registerPassword").value,p2=$("registerPassword2").value;
- if(!email||!code||!p||!p2)return err("Ҳамаи майдонҳоро пур кунед.");if(p.length<6)return err("Парол бояд камаш 6 аломат дошта бошад.");if(p!==p2)return err("Паролҳо мувофиқ нестанд.");
- try{const ref=doc(registrationDb,"invitations",code),s=await getDoc(ref);if(!s.exists())return err("Коди даъват нодуруст аст.");const inv=s.data();if(inv.status!=="pending")return err("Код аллакай истифода шудааст.");if(String(inv.email).toLowerCase()!==email)return err("Email мувофиқат намекунад.");
- // create the auth account; if a previous attempt created it but failed later, sign in and finish
- let c;try{c=await createUserWithEmailAndPassword(registrationAuth,email,p)}catch(e){if(e.code==="auth/email-already-in-use")c=await signInWithEmailAndPassword(registrationAuth,email,p);else throw e}
- // profile + invitation in ONE atomic batch: either both are written or none
- const b=writeBatch(registrationDb);
- b.set(doc(registrationDb,"users",c.user.uid),{name:inv.name,email,phone:inv.phone||"",role:"supervisor",assignedRoomIds:inv.roomIds||[],inviteCode:code,createdAt:serverTimestamp()});
- b.update(ref,{status:"used",uid:c.user.uid,usedAt:serverTimestamp()});
- await b.commit();
- // claiming free rooms is best-effort (a room may already have a supervisor)
- for(const rid of inv.roomIds||[])try{await updateDoc(doc(registrationDb,"rooms",rid),{supervisorId:c.user.uid})}catch(e){console.warn(e)}
- await signOut(registrationAuth);ok("Бақайдгирӣ бомуваффақият анҷом ёфт.");renderLogin();
- }catch(e){console.error(e);try{await signOut(registrationAuth)}catch(_){}err("Хатогӣ: "+e.message)}
+
+export function closeModal() {
+  const backdrop = document.getElementById("modal-backdrop");
+  if (backdrop) backdrop.style.display = "none";
 }
- 
-/* ---------- shell ---------- */
-function shell(){
- document.body.innerHTML=`<div id="app"><aside class="sidebar"><div class="brand"><div class="logo brand-icon"><img src="assets/dormitory-logo.png"></div><div><b>Dormitory</b><small>Management System</small></div></div><nav id="nav"><button data-page="dashboard">📊 Dashboard</button><button data-page="students">👨‍🎓 Талабаҳо</button><button data-page="rooms">🛏️ Ҳуҷраҳо</button><button data-page="attendance">📋 Давомот</button><button data-page="violations">⚠️ Қоидавайронкунӣ</button><button data-page="cleanliness">🏆 Озмуни тозагӣ</button><button data-page="roster">🗓️ Навбатдорӣ</button><button data-page="tea">🍵 Чойнӯшӣ</button><button data-page="chat">💬 Чат</button><button data-page="supervisors">👥 Мураббиён</button></nav><div class="sidebar-bottom"><span>${esc(roleLabel(state.profile?.role))}</span><button id="logout">Баромадан</button></div></aside><div id="sidebarOverlay" class="sidebar-overlay"></div><main class="main"><div id="loadingBar" class="loading-bar"></div><header><button id="menu">☰</button><div><h1 id="title">Dashboard</h1><p id="subtitle">Идоракунии хобгоҳ</p></div><div class="user">👤 ${esc(state.profile?.name||state.profile?.email)}</div></header><section id="content"></section></main></div><div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><div id="modalContent"></div></div></div>`;
- $("logout").onclick=logout;$("closeModal").onclick=closeModal;
- function closeSidebar(){document.querySelector(".sidebar")?.classList.remove("open");$("sidebarOverlay")?.classList.remove("show")}
- $("nav").onclick=e=>{const b=e.target.closest("[data-page]");if(b){state.page=b.dataset.page;renderPage();closeSidebar()}};
- $("menu").onclick=()=>{document.querySelector(".sidebar")?.classList.toggle("open");$("sidebarOverlay")?.classList.toggle("show")};
- $("sidebarOverlay").onclick=closeSidebar;
-}
-async function seedRooms(){if(!elevated())return;const s=await getDocs(collection(db,"rooms"));if(!s.empty)return;for(let i=1;i<=10;i++){const id=`room${String(i).padStart(2,"0")}`;await setDoc(doc(db,"rooms",id),{id,number:i,name:`Ҳуҷра №${i}`,type:i<=7?"student":"supervisor",capacity:i<=7?8:4,supervisorId:null,createdAt:serverTimestamp()})}}
- 
-/* ---------- real-time listeners ---------- */
-function clearListeners(){state.unsubs.forEach(u=>{try{u()}catch(e){}});state.unsubs=[]}
-function startListening(){
- clearListeners();
- state._syncErrors=new Set();
- state._day=todayStr();
- setLoading(true);
- const el=elevated();
- const targets=[
-  ["students",el?collection(db,"students"):query(collection(db,"students"),where("supervisorId","==",uid()))],
-  ["rooms",el?collection(db,"rooms"):query(collection(db,"rooms"),where("supervisorId","==",uid()))],
-  ["placements",el?collection(db,"placements"):query(collection(db,"placements"),where("supervisorId","==",uid()))],
-  ["residences",el?collection(db,"residences"):query(collection(db,"residences"),where("supervisorId","==",uid()))],
-  // elevated users load only the last 6 months of attendance (the collection grows every day)
-  ["attendance",el?query(collection(db,"attendance"),where("date",">=",monthsAgoStr(6))):query(collection(db,"attendance"),where("supervisorId","==",uid()))],
-  ["violations",el?collection(db,"violations"):query(collection(db,"violations"),where("supervisorId","==",uid()))],
-  ["cleanliness",el?collection(db,"cleanliness_inspections"):query(collection(db,"cleanliness_inspections"),where("supervisorId","==",uid()))],
-  ["teaRecipes",collection(db,"tea_recipes")],
-  ["roster",collection(db,"duty_roster")],
-  ["activities",collection(db,"activities")],
-  ["dailySchedule",collection(db,"daily_schedule")],
-  ["dutyLogs",el?collection(db,"duty_logs"):query(collection(db,"duty_logs"),where("userId","==",uid()))],
-  ["wakeConfirms",el?query(collection(db,"wake_confirmations"),where("date","==",todayStr())):query(collection(db,"wake_confirmations"),where("date","==",todayStr()),where("userId","==",uid()))],
-  // only today's confirmations are ever displayed
-  ["stageConfirms",query(collection(db,"stage_confirmations"),where("date","==",todayStr()))],
-  ["chat",query(collection(db,"chat_messages"),orderBy("createdAt","asc"),limit(200))]
- ];
- if(el)targets.push(["supervisors",query(collection(db,"users"),where("role","in",["supervisor","head"]))]);
- else state.supervisors=[{id:uid(),...state.profile}];
- let pending=targets.length+2,started=false;
- const markDone=()=>{pending--;if(pending<=0&&!started){started=true;setLoading(false)}};
- targets.forEach(([key,q])=>{
-  let first=true;
-  const unsub=onSnapshot(q,snap=>{
-   state[key]=snap.docs.map(d=>({id:d.id,...d.data()}));
-   if(first){first=false;markDone()}
-   if(key==="roster")checkDutyNotice();
-   if(key==="dailySchedule")checkActivityNotices();
-   scheduleRender();
-  },e=>{console.error(e);if(first){first=false;markDone()} if(!state._syncErrors)state._syncErrors=new Set(); const syncKey=e.code||e.message||key; if(!state._syncErrors.has(syncKey)){state._syncErrors.add(syncKey);err("Хатогии синхронизатсия: "+(e.code==="permission-denied"?"Иҷозаи дастрасӣ ба баъзе маълумот дода нашудааст.":e.message))}});
-  state.unsubs.push(unsub);
- });
- const unsubWake=onSnapshot(doc(db,"app_settings","wake_schedule"),snap=>{ state.wakeSettings=snap.exists()?snap.data():null; markDone(); scheduleRender(); },e=>{console.error(e);markDone()});
- state.unsubs.push(unsubWake);
- const unsubStages=onSnapshot(doc(db,"app_settings","daily_stages"),snap=>{
-  state.stages=snap.exists()?snap.data():null;markDone();scheduleRender();
- },e=>{console.error(e);markDone()});
- state.unsubs.push(unsubStages);
-}
-/* many snapshots arrive at once on startup: render at most once per animation frame */
-let _renderQueued=false;
-function scheduleRender(){if(_renderQueued)return;_renderQueued=true;requestAnimationFrame(()=>{_renderQueued=false;if($("content"))renderPage()})}
-function checkDutyNotice(){
- if(state._dutyNotified||isManager())return;
- const rec=state.roster.find(r=>r.id===todayKey());
- if(rec?.supervisorIds?.includes(uid())){state._dutyNotified=true;toast("Шумо имрӯз навбатдор ҳастед 🔔","ok")}
-}
- 
-/* ---------- automatic daily activities / wake-up / duty ---------- */
-function notifyUser(title,body,key){
-  toast(`${title}: ${body}`,"ok");
-  try{ if("Notification" in window && Notification.permission==="granted") new Notification(title,{body}); }catch(e){}
-}
-async function requestNotifications(){
-  try{ if("Notification" in window && Notification.permission==="default") await Notification.requestPermission(); }catch(e){}
-}
-function minutesNow(){const d=new Date();return d.getHours()*60+d.getMinutes();}
-function parseHM(v){const m=String(v||"").match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):-1}
-/* true during the first 2 minutes after `start` — background tabs throttle timers, so an exact-minute check could miss */
-const NOTICE_WINDOW=2;
-const justStarted=(start,now)=>start>=0&&now>=start&&now-start<NOTICE_WINDOW;
-function activeDailyActivities(){
- const day=todayKey(), now=minutesNow();
- return state.dailySchedule.filter(a=>a.enabled!==false && (!a.days||a.days.includes(day))).map(a=>({...a,start:parseHM(a.startTime)})).filter(a=>a.start>=0&&a.start<=now).sort((a,b)=>b.start-a.start);
-}
-function checkActivityNotices(){
- const now=minutesNow(),day=todayKey(),date=todayStr();
- state.dailySchedule.filter(a=>a.enabled!==false&&(!a.days||a.days.includes(day))).forEach(a=>{const start=parseHM(a.startTime);if(!justStarted(start,now))return;const key=`${date}_${a.id}`;if(state._activityNotified.has(key))return;state._activityNotified.add(key);notifyUser("Фаъолияти нав",`${a.title} — ${a.startTime}` ,key)});
-}
-function checkWakeNotice(){
- const t=parseHM(state.wakeSettings?.time);if(!justStarted(t,minutesNow()))return;const key=`wake_${todayStr()}`;if(state._activityNotified.has(key))return;state._activityNotified.add(key);notifyUser("Вақти бедоршавӣ",`Вақти бедоршавӣ ${state.wakeSettings.time} аст.` ,key);
-}
-let _lastMinute=-1;
-setInterval(()=>{
- if(!state.user)return;
- // after midnight: restart listeners that are filtered by today's date
- if(state._day&&state._day!==todayStr()){state._activityNotified.clear();state._dutyNotified=false;startListening()}
- checkActivityNotices();checkWakeNotice();ensureActiveDutyLog().catch(e=>console.warn(e));
- // only the dashboard shows time-dependent cards; re-render it once per minute instead of every page every 20s
- const m=minutesNow();if(m!==_lastMinute){_lastMinute=m;if(state.page==="dashboard")scheduleRender()}
-},20000);
-function myActiveDuty(){
- const day=todayKey(), now=minutesNow();
- // an overnight shift (e.g. 22:00–06:00) is still active after midnight: also check yesterday's roster entry
- const yday=DAY_KEYS[(new Date().getDay()+6)%7];
- const mine=r=>r.startTime&&r.endTime&&((r.supervisorIds||[]).includes(uid())||r.supervisorId===uid());
- return state.roster.filter(r=>r.day===day&&mine(r)).find(r=>{const a=parseHM(r.startTime),b=parseHM(r.endTime);return a>=0&&b>=0&&(a<b?now>=a&&now<b:now>=a)})
-  || state.roster.filter(r=>r.day===yday&&mine(r)).find(r=>{const a=parseHM(r.startTime),b=parseHM(r.endTime);return a>=0&&b>=0&&a>b&&now<b});
-}
-/* start of the current shift; the log key uses the start date, so an overnight shift keeps one log */
-function dutyStart(d){const s=new Date();const p=String(d.startTime||"").split(":");if(p.length===2){s.setHours(Number(p[0]),Number(p[1]),0,0);if(s.getTime()>Date.now())s.setDate(s.getDate()-1)}return s}
-function dutyKey(d){return`${d.id}_${uid()}_${localDateStr(dutyStart(d))}`}
-async function ensureActiveDutyLog(){
- const d=myActiveDuty(); if(!d||elevated())return null;
- const key=dutyKey(d); const ref=doc(db,"duty_logs",key); const existing=state.dutyLogs.find(x=>x.id===key);
- if(existing)return existing;
- if(state._dutyCreating===key)return null;state._dutyCreating=key;
- try{
-  const snap=await getDoc(ref);if(snap.exists())return {id:key,...snap.data()};
-  const started=dutyStart(d);
-  const data={rosterId:d.id,userId:uid(),userName:state.profile?.name||state.profile?.email,date:localDateStr(started),startedAt:started.toISOString(),endedAt:null,createdAt:serverTimestamp()};
-  await setDoc(ref,data);
-  return {id:key,...data};
- }finally{state._dutyCreating=null}
-}
-async function finishDuty(id){
- const d=state.roster.find(r=>r.id===id);if(!d)return;
- const key=dutyKey(d),log=state.dutyLogs.find(x=>x.id===key);
- if(log?.endedAt)return;
- try{
-  // end time is set by the server clock, not the user's device
-  if(log)await updateDoc(doc(db,"duty_logs",key),{endedAt:serverTimestamp()});
-  else{const started=dutyStart(d);await setDoc(doc(db,"duty_logs",key),{rosterId:id,userId:uid(),userName:state.profile?.name||state.profile?.email,date:localDateStr(started),startedAt:started.toISOString(),endedAt:serverTimestamp(),createdAt:serverTimestamp()})}
-  ok("Навбатдорӣ ба анҷом расид.");
- }catch(e){console.error(e);err(e.message)}
-}
-function wakeStatusForMe(){return state.wakeConfirms.find(x=>x.userId===uid())}
-async function confirmWake(){
- const key=`${todayStr()}_${uid()}`;
- try{
-  // confirmation time comes from the server clock and cannot be edited later
-  await setDoc(doc(db,"wake_confirmations",key),{date:todayStr(),userId:uid(),userName:state.profile?.name||state.profile?.email,confirmedAt:serverTimestamp(),createdAt:serverTimestamp()});
-  ok("Вақти бедоршавӣ сабт шуд.");
- }catch(e){console.error(e);err(e.code==="permission-denied"?"Бедоршавӣ аллакай сабт шудааст.":e.message)}
-}
-function dailyScheduleCard(){
- const active=activeDailyActivities()[0];
- if(!active)return `<div class="section-card today-activity-card"><h3>Фаъолиятҳои имрӯза</h3><p>Ҳоло фаъолияти фаъол нест.</p></div>`;
- return `<div class="section-card today-activity-card active-now"><div><span class="live-badge">● ҲОЗИР</span><h3>${esc(active.title)}</h3><p>Оғоз: <b>${esc(active.startTime)}</b></p></div></div>`;
-}
-function wakeCard(){
- if(!state.wakeSettings?.time)return "";
- const w=wakeStatusForMe();
- return `<div class="section-card wake-card"><div><span>🌅 Бедоршавӣ</span><h3>${esc(state.wakeSettings.time)}</h3><p>${w?`✅ Бедоршавӣ сабт шуд: ${chatTime(w.confirmedAt)}`:"Тугмаро пахш кунед, вақте бедор шудед."}</p></div>${!w?`<button class="btn btn-primary" onclick="confirmWake()">🟢 Ман бедор шудам</button>`:""}</div>`;
-}
-function dutyCard(){
- const d=myActiveDuty(); if(!d)return ""; const log=state.dutyLogs.find(x=>x.id===dutyKey(d));
- return `<div class="section-card duty-live-card"><div><span class="live-badge">🛡️ НАВБАТДОРӢ</span><h3>${esc(d.title||"Навбатдорӣ")}</h3><p>${esc(d.startTime)} — ${esc(d.endTime)}</p><p>${log?.endedAt?`Анҷом: ${chatTime(log.endedAt)}`:"Навбат идома дорад."}</p></div>${!log?.endedAt?`<button class="btn btn-danger" onclick="finishDuty('${d.id}')">Ба анҷом расонидан</button>`:""}</div>`;
-}
- 
-/* ---------- dashboard ---------- */
-let trendChart=null;
-const MONTHS_TG=["Янв","Фев","Март","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
-function last6Months(){const out=[];const now=new Date();for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);out.push({key:`${d.getFullYear()}-${d.getMonth()}`,label:MONTHS_TG[d.getMonth()]})}return out}
-function dashboardPage(){
- const active=state.students.filter(s=>s.status==="Active").length,sr=state.rooms.filter(r=>r.type==="student"),total=sr.reduce((a,r)=>a+cap(r),0),occ=state.students.filter(s=>s.status==="Active"&&s.roomId).length;
- $("content").innerHTML=`<div class="page-head"><div><h2>Dashboard</h2><p>Хулосаи ҳолати хобгоҳ</p></div>${elevated()?`<div class="action-row"><button class="btn btn-secondary" onclick="openDailyScheduleManager()">⏰ Ҷадвали фаъолиятҳо</button><button class="btn btn-secondary" onclick="openWakeManager()">🌅 Вақти бедоршавӣ</button></div>`:""}</div><div class="stats-grid"><div class="stat-card"><b>${active}</b><small>Талабаҳо</small></div><div class="stat-card"><b>${sr.length}</b><small>Ҳуҷраҳо</small></div><div class="stat-card"><b>${occ}</b><small>Ҷойҳои ишғолшуда</small></div><div class="stat-card"><b>${total-occ}</b><small>Ҷойҳои холӣ</small></div><div class="stat-card"><b>${state.attendance.filter(a=>a.date===todayStr()&&a.status==="present").length}</b><small>Ҳозир (имрӯз)</small></div><div class="stat-card"><b>${state.violations.length}</b><small>Қоидавайронкунӣ</small></div></div>${dailyScheduleCard()}${wakeCard()}${dutyCard()}<div class="section-card"><h3>Ҳолати ҳуҷраҳо</h3><div class="room-grid">${sr.map(r=>`<div class="room-mini" onclick="openRoom('${r.id}')"><b>${esc(r.name)}</b><strong>${state.students.filter(s=>s.roomId===r.id&&s.status==="Active").length}/${cap(r)}</strong></div>`).join("")}</div></div><div class="section-card"><h3>Ҷадвали ҳафтаинаи фаъолиятҳо</h3>${renderActivityTable()}</div><div class="section-card"><h3>Тамоюли 6 моҳи охир</h3><div class="chart-box"><canvas id="trendChart"></canvas></div></div>`;
- renderTrendChart();
-}
-function renderTrendChart(){
- const canvas=$("trendChart");if(!canvas||typeof Chart==="undefined")return;
- const months=last6Months();
- const absences=months.map(m=>state.attendance.filter(a=>a.status!=="present"&&a.date&&(()=>{const d=new Date(a.date);return`${d.getFullYear()}-${d.getMonth()}`===m.key})()).length);
- const violations=months.map(m=>state.violations.filter(v=>{const d=v.createdAt?.toDate?.();return d&&`${d.getFullYear()}-${d.getMonth()}`===m.key}).length);
- trendChart?.destroy();
- trendChart=new Chart(canvas.getContext("2d"),{type:"line",data:{labels:months.map(m=>m.label),datasets:[
-  {label:"Ғоибӣ",data:absences,borderColor:"#a3452c",backgroundColor:"rgba(163,69,44,.12)",tension:.3,fill:true},
-  {label:"Қоидавайронкунӣ",data:violations,borderColor:"#0b5d3b",backgroundColor:"rgba(11,93,59,.12)",tension:.3,fill:true}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{family:"Manrope"}}}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
-}
- 
-/* ---------- weekly activity table ---------- */
-function renderActivityTable(){
- const days=["mon","tue","wed","thu","fri","sat","sun"];
- const classes=[...new Set(state.students.map(s=>s.className).map(x=>(x||"").trim()).filter(Boolean))].sort();
- if(!classes.length)return"<p>Аввал ба талабаҳо синф диҳед, то ҷадвал намоён шавад.</p>";
- const canEdit=elevated();
- let html='<div class="table-wrap"><table><tr><th>Рӯз</th>'+classes.map(c=>`<th>${esc(c)}</th>`).join("")+"</tr>";
- days.forEach(dk=>{
-  html+=`<tr><td>${DAY_LABELS[dk]}</td>`+classes.map(c=>{
-   const a=state.activities.find(x=>x.day===dk&&x.className===c);
-   return `<td class="activity-cell"${canEdit?` onclick="openActivity('${dk}','${attrStr(c)}')"`:""}>${esc(a?.activity||"—")}</td>`;
-  }).join("")+"</tr>";
- });
- html+="</table></div>";
- return html;
-}
-function openActivity(dk,cls){const a=state.activities.find(x=>x.day===dk&&x.className===cls);modal(`<h2>${DAY_LABELS[dk]} — ${esc(cls)}</h2><div class="form-group"><label>Фаъолият</label><input id="activityText" value="${esc(a?.activity||"")}"></div><button class="btn btn-primary" onclick="saveActivity('${dk}','${attrStr(cls)}')">Нигоҳ доштан</button>`)}
-async function saveActivity(dk,cls){const v=$("activityText").value.trim();await setDoc(doc(db,"activities",`${dk}_${cls}`),{day:dk,className:cls,activity:v,updatedAt:serverTimestamp()},{merge:true});closeModal();ok("Ҷадвал нав шуд.")}
- 
-/* ---------- students ---------- */
-function studentsPage(){
- if($("studentRows")){renderStudentRows($("studentSearch")?.value||"");return}
- const canAdd=elevated()||state.profile?.role==="supervisor";
- $("content").innerHTML=`<div class="page-head"><div><h2>Талабаҳо</h2><p>Рӯйхати талабаҳо</p></div>${canAdd?'<button class="btn btn-primary" onclick="openAddStudent()">+ Талабаи нав</button>':""}</div><div class="toolbar"><input id="studentSearch" placeholder="Ҷустуҷӯ..." oninput="renderStudentRows(this.value)"></div><div class="table-wrap"><table><thead><tr><th>Ном</th><th>Синф</th><th>Телефон</th><th>Ҳуҷра</th><th>Ҷой</th><th>Мураббӣ</th><th>Ҳолат</th></tr></thead><tbody id="studentRows"></tbody></table></div>`;renderStudentRows("");
-}
-function renderStudentRows(x){x=String(x||"").toLowerCase();const a=state.students.filter(s=>!x||`${s.name} ${s.className||""} ${s.phone||""}`.toLowerCase().includes(x));$("studentRows").innerHTML=a.map(s=>`<tr><td><button class="link-btn" onclick="openStudent('${s.id}')">${esc(s.name)}</button></td><td>${esc(s.className||"—")}</td><td>${esc(s.phone||"—")}</td><td>${esc(roomName(s.roomId))}</td><td>${esc(s.place||"—")}</td><td>${esc(supervisorName(s.supervisorId))}</td><td>${status(s.status)}</td></tr>`).join("")||`<tr><td colspan="7">Талаба ёфт нашуд.</td></tr>`}
-function openAddStudent(){
- const sup=state.profile?.role==="supervisor";
- const rooms=state.rooms.filter(r=>r.type==="student" && (!sup || (state.profile.assignedRoomIds||[]).includes(r.id)));
- if(sup && !rooms.length)return err("Ба шумо ҳуҷраи таъиншуда вуҷуд надорад.");
- const room=rooms[0];
- const freePlaces=room?Array.from({length:cap(room)},(_,i)=>i+1).filter(i=>!state.students.some(s=>s.status==="Active"&&s.roomId===room.id&&Number(s.place)===i)):[];
- if(sup && !freePlaces.length)return err("Дар ҳуҷраи шумо ҷойи холӣ нест.");
- modal(`<h2>Талабаи нав</h2><div class="form-grid"><div class="form-group"><label>Номи пурра</label><input id="studentName"></div><div class="form-group"><label>Таваллуд</label><input id="studentDob" type="date"></div><div class="form-group"><label>Телефон</label><input id="studentPhone"></div><div class="form-group"><label>Телефони падар</label><input id="studentFather"></div><div class="form-group"><label>Суроға</label><input id="studentAddress"></div><div class="form-group"><label>Синф</label><input id="studentClass"></div><div class="form-group"><label>Муаллими синф</label><input id="studentTeacher"></div>${sup?`<div class="form-group"><label>Ҳуҷра</label><select id="studentRoom">${rooms.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷойи хоб</label><select id="studentPlace">${freePlaces.map(i=>`<option value="${i}">${i}</option>`).join("")}</select></div>`:""}<div class="form-group"><label>Санаи омадан ба хобгоҳ</label><input id="studentStartDate" type="date" value="${todayStr()}"></div></div><button class="btn btn-primary" onclick="createStudent()">Сабт кардан</button>`)
-}
-async function createStudent(){
- const name=$("studentName").value.trim();if(!name)return err("Номро ворид кунед.");
- const sup=state.profile?.role==="supervisor";
- const startDate=$("studentStartDate")?.value||"";if(sup&&!startDate)return err("Санаи омаданро интихоб кунед.");
- const data={name,dob:$("studentDob").value,phone:$("studentPhone").value.trim(),fatherPhone:$("studentFather").value.trim(),address:$("studentAddress").value.trim(),className:$("studentClass").value.trim(),classTeacher:$("studentTeacher").value.trim(),supervisorId:sup?uid():null,roomId:sup?$("studentRoom").value:null,place:sup?Number($("studentPlace").value):null,status:"Active",admissionDate:sup?startDate:null,departureDate:null,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
- try{
-  if(sup){const rid=data.roomId,p=Number(data.place),roomRef=doc(db,"rooms",rid),lockRef=doc(db,"bed_locks",bedLockId(rid,p)),sr=doc(collection(db,"students"));await runTransaction(db,async t=>{const rr=await t.get(roomRef),lk=await t.get(lockRef);if(!rr.exists())throw Error("Ҳуҷра ёфт нашуд.");if(rr.data().supervisorId!==uid())throw Error("Ин ҳуҷра ба шумо тааллуқ надорад.");if(p<1||p>cap(rr.data()))throw Error("Ҷойи хоб нодуруст аст.");if(bedTaken(lk,rid,p,sr.id))throw Error("Ин ҷой аллакай ишғол шудааст.");t.set(sr,data);t.set(lockRef,{roomId:rid,place:p,studentId:sr.id,updatedAt:serverTimestamp()});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sr.id,roomId:rid,place:p,supervisorId:uid(),action:"assigned",startDate,createdAt:serverTimestamp()});const res=doc(collection(db,"residences"));t.set(res,{studentId:sr.id,roomId:rid,place:p,supervisorId:uid(),startDate,endDate:null,createdAt:serverTimestamp()})});
-  }else{const ref=await addDoc(collection(db,"students"),data);}
-  closeModal();ok("Талаба илова шуд.");
- }catch(e){console.error(e);err(e.message||"Хатогӣ ҳангоми сабт.")}
-}
-function openStudent(id){const s=state.students.find(x=>x.id===id);if(!s)return;const a=state.attendance.filter(x=>x.studentId===id),v=state.violations.filter(x=>x.studentId===id),rh=residenceHistory(id),canEdit=elevated()||(state.profile?.role==="supervisor"&&s.supervisorId===uid());
- modal(`<h2>${esc(s.name)}</h2><div class="profile-grid"><div><b>Таваллуд:</b> ${date(s.dob)}</div><div><b>Телефон:</b> ${esc(s.phone||"—")}</div><div><b>Падар:</b> ${esc(s.fatherPhone||"—")}</div><div><b>Суроға:</b> ${esc(s.address||"—")}</div><div><b>Синф:</b> ${esc(s.className||"—")}</div><div><b>Муаллим:</b> ${esc(s.classTeacher||"—")}</div><div><b>Ҳуҷра:</b> ${esc(roomName(s.roomId))}</div><div><b>Ҷой:</b> ${esc(s.place||"—")}</div><div><b>Мураббӣ:</b> ${esc(supervisorName(s.supervisorId))}</div><div><b>Ҳолат:</b> ${status(s.status)}</div><div><b>Омад ба хобгоҳ:</b> ${date(s.admissionDate)}</div><div><b>Баромад:</b> ${date(s.departureDate)}</div></div>
- ${canEdit?`<div class="action-row">${s.roomId?`<button class="btn btn-secondary" onclick="openTransferStudent('${s.id}')">Гузарондан ба ҳуҷраи дигар</button><button class="btn btn-secondary" onclick="removeFromRoom('${s.id}')">Хориҷ аз ҳуҷра</button>`:""}<button class="btn btn-secondary" onclick="openEditStudent('${s.id}')">Ислоҳ</button>${isManager()?`<button class="btn btn-danger" onclick="deleteStudent('${s.id}')">Нест кардан</button>`:""}</div>`:""}
- <h3>Таърихи истиқомат</h3><div class="table-wrap"><table><tr><th>Аз сана</th><th>То сана</th><th>Ҳуҷра</th><th>Ҷой</th></tr>${rh.map(x=>`<tr><td>${esc(x.startDate||"—")}</td><td>${esc(x.endDate||"Ҳозир")}</td><td>${esc(roomName(x.roomId))}</td><td>${esc(x.place||"—")}</td></tr>`).join("")||"<tr><td colspan=4>Таърих нест.</td></tr>"}</table></div><h3>Давомот</h3><div class="table-wrap"><table><tr><th>Сана</th><th>Ҳолат</th><th>Эзоҳ</th></tr>${a.map(x=>`<tr><td>${esc(x.date)}</td><td>${att(x.status)}</td><td>${esc(x.note||"—")}</td></tr>`).join("")||"<tr><td colspan=3>Маълумот нест.</td></tr>"}</table></div><h3>Қоидавайронкунӣ</h3><div class="table-wrap"><table><tr><th>Тавсиф</th><th>Дараҷа</th></tr>${v.map(x=>`<tr><td>${esc(x.description)}</td><td>${esc(x.severity||"—")}</td></tr>`).join("")||"<tr><td colspan=2>Маълумот нест.</td></tr>"}</table></div>`)
-}
-function openEditStudent(id){const s=state.students.find(x=>x.id===id);if(!s)return;const canEdit=elevated()||(state.profile?.role==="supervisor"&&s.supervisorId===uid());if(!canEdit)return err("Иҷозаи таҳрир надоред.");modal(`<h2>Ислоҳи маълумот</h2><div class="form-grid"><div class="form-group"><label>Номи пурра</label><input id="studentName" value="${esc(s.name)}"></div><div class="form-group"><label>Таваллуд</label><input id="studentDob" type="date" value="${esc(s.dob||"")}"></div><div class="form-group"><label>Телефон</label><input id="studentPhone" value="${esc(s.phone||"")}"></div><div class="form-group"><label>Телефони падар</label><input id="studentFather" value="${esc(s.fatherPhone||"")}"></div><div class="form-group"><label>Суроға</label><input id="studentAddress" value="${esc(s.address||"")}"></div><div class="form-group"><label>Синф</label><input id="studentClass" value="${esc(s.className||"")}"></div><div class="form-group"><label>Муаллими синф</label><input id="studentTeacher" value="${esc(s.classTeacher||"")}"></div><div class="form-group"><label>Санаи омадан</label><input id="studentStartDate" type="date" value="${esc(s.admissionDate||currentResidence(id)?.startDate||"")}"></div><div class="form-group"><label>Ҳолат</label><select id="studentStatus"><option value="Active"${s.status==="Active"?" selected":""}>Фаъол</option><option value="Temporarily absent"${s.status==="Temporarily absent"?" selected":""}>Ғоиб</option><option value="Transferred"${s.status==="Transferred"?" selected":""}>Гузаронида шуд</option><option value="Removed"${s.status==="Removed"?" selected":""}>Хориҷшуда</option></select></div></div><button class="btn btn-primary" onclick="updateStudent('${id}')">Нигоҳ доштан</button>`)}
-async function updateStudent(id){const name=$("studentName").value.trim();if(!name)return err("Номро ворид кунед.");const s=state.students.find(x=>x.id===id);const start=$("studentStartDate")?.value||s.admissionDate||null;try{await updateDoc(doc(db,"students",id),{name,dob:$("studentDob").value,phone:$("studentPhone").value.trim(),fatherPhone:$("studentFather").value.trim(),address:$("studentAddress").value.trim(),className:$("studentClass").value.trim(),classTeacher:$("studentTeacher").value.trim(),status:$("studentStatus").value,admissionDate:start,updatedAt:serverTimestamp()});closeModal();ok("Маълумот нигоҳ дошта шуд.")}catch(e){err(e.message)}}
-async function deleteStudent(id){if(!isManager())return err("Танҳо Manager метавонад талабаро пурра нест кунад.");if(!confirm("Талаба пурра нест карда шавад? Ин амал бозгашт надорад."))return;
- try{
-  // delete the student together with all related records so no orphans remain
-  const refs=[doc(db,"students",id)];
-  for(const coll of ["attendance","violations","residences","placements"]){const snap=await getDocs(query(collection(db,coll),where("studentId","==",id)));snap.forEach(d=>refs.push(d.ref))}
-  const s=state.students.find(x=>x.id===id);
-  if(s?.roomId&&s.place){const lr=doc(db,"bed_locks",bedLockId(s.roomId,Number(s.place))),ls=await getDoc(lr);if(ls.exists()&&ls.data().studentId===id)refs.push(lr)}
-  for(let i=0;i<refs.length;i+=400){const b=writeBatch(db);refs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit()}
-  closeModal();ok("Талаба нест карда шуд.");
- }catch(e){console.error(e);err(e.message)}
-}
-function openTransferStudent(sid){const s=state.students.find(x=>x.id===sid);if(!s)return;const sup=state.profile?.role==="supervisor";const rooms=state.rooms.filter(r=>r.type==="student"&&r.id!==s.roomId&&(!sup||(state.profile.assignedRoomIds||[]).includes(r.id)));if(sup)return err("Мураббӣ танҳо ҳуҷраи ба худ вобастаро идора мекунад. Барои гузаронидан ба ҳуҷраи дигар Manager амал мекунад.");modal(`<h2>Гузарондани ${esc(s.name)}</h2><div class="form-group"><label>Ҳуҷраи нав</label><select id="transferRoom">${rooms.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><input id="transferPlace" type="number" min="1"></div><div class="form-group"><label>Мураббӣ</label><select id="transferSupervisor">${state.supervisors.map(x=>`<option value="${x.id}">${esc(x.name||x.email)}</option>`).join("")}</select></div><div class="form-group"><label>Санаи гузариш</label><input id="transferDate" type="date" value="${todayStr()}"></div><button class="btn btn-primary" onclick="confirmTransfer('${sid}')">Гузарондан</button>`)}
-async function confirmTransfer(sid){const rid=$("transferRoom").value,p=Number($("transferPlace").value),sp=$("transferSupervisor").value,startDate=$("transferDate").value||todayStr();if(!rid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");const old=state.students.find(x=>x.id===sid);try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),lockRef=doc(db,"bed_locks",bedLockId(rid,p)),oldLockRef=old?.roomId&&old.place&&bedLockId(old.roomId,Number(old.place))!==bedLockId(rid,p)?doc(db,"bed_locks",bedLockId(old.roomId,Number(old.place))):null,ss=await t.get(sr),rs=await t.get(rr),lk=await t.get(lockRef),olk=oldLockRef?await t.get(oldLockRef):null;if(!ss.exists())throw Error("Талаба ёфт нашуд.");if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(p<1||p>cap(rs.data()))throw Error("Ҷойи хоб нодуруст аст.");if(bedTaken(lk,rid,p,sid))throw Error("Ҷой аллакай ишғол шудааст.");if(olk?.exists()&&olk.data().studentId===sid)t.delete(oldLockRef);t.set(lockRef,{roomId:rid,place:p,studentId:sid,updatedAt:serverTimestamp()});const oldRes=state.residences.find(r=>r.studentId===sid&&!r.endDate);if(oldRes)t.update(doc(db,"residences",oldRes.id),{endDate:startDate});t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",admissionDate:ss.data().admissionDate||startDate,updatedAt:serverTimestamp()});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"transferred",startDate,createdAt:serverTimestamp()});const res=doc(collection(db,"residences"));t.set(res,{studentId:sid,roomId:rid,place:p,supervisorId:sp,startDate,endDate:null,createdAt:serverTimestamp()})});closeModal();ok("Талаба гузаронида шуд.")}catch(e){err(e.message)}}
-async function removeFromRoom(sid){const s=state.students.find(x=>x.id===sid);if(!s)return;const can=elevated()||(state.profile?.role==="supervisor"&&s.supervisorId===uid());if(!can)return err("Шумо ин талабаро идора карда наметавонед.");if(!confirm("Талаба аз ҳуҷра хориҷ карда шавад?"))return;const endDate=prompt("Санаи баромадан аз хобгоҳ:",todayStr())||todayStr();try{await runTransaction(db,async t=>{const lockRef=s.roomId&&s.place?doc(db,"bed_locks",bedLockId(s.roomId,Number(s.place))):null,lk=lockRef?await t.get(lockRef):null;if(lk?.exists()&&lk.data().studentId===sid)t.delete(lockRef);t.update(doc(db,"students",sid),{roomId:null,place:null,supervisorId:null,departureDate:endDate,status:"Removed",updatedAt:serverTimestamp()});const oldRes=state.residences.find(r=>r.studentId===sid&&!r.endDate);if(oldRes)t.update(doc(db,"residences",oldRes.id),{endDate});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:s.roomId||null,place:s.place||null,supervisorId:s.supervisorId||uid(),action:"removed",endDate,createdAt:serverTimestamp()})});closeModal();ok("Талаба аз ҳуҷра хориҷ шуд.")}catch(e){err(e.message)}}
- 
-/* ---------- rooms (manager: full CRUD; students & supervisors sections shown separately) ---------- */
-function roomsPage(){
- if($("roomCards")){renderRoomCards($("roomSearch")?.value||"");return}
- $("content").innerHTML=`<div class="page-head"><div><h2>Ҳуҷраҳо</h2><p>Ҷойҳои хоб</p></div>${elevated()?'<button class="btn btn-primary" onclick="openAddRoom()">+ Ҳуҷраи нав</button>':""}</div><div class="toolbar"><input id="roomSearch" placeholder="Ҷустуҷӯ аз рӯи ном ё мураббӣ..." oninput="renderRoomCards(this.value)"></div><div id="roomCards"></div>`;renderRoomCards("");
-}
-function renderRoomCards(x){
- x=String(x||"").toLowerCase();
- const match=r=>!x||`${r.name} ${supervisorName(r.supervisorId)}`.toLowerCase().includes(x);
- const students=state.rooms.filter(r=>r.type!=="supervisor"&&match(r)).sort((a,b)=>(a.number||0)-(b.number||0));
- const staffRooms=state.rooms.filter(r=>r.type==="supervisor"&&match(r)).sort((a,b)=>(a.number||0)-(b.number||0));
- const card=r=>{const n=state.students.filter(s=>s.roomId===r.id&&s.status==="Active").length;return`<div class="room-card" onclick="openRoom('${r.id}')"><h3>🛏️ ${esc(r.name)}</h3><strong>${n}/${cap(r)}</strong><p>${cap(r)-n} ҷой холӣ</p><small>${esc(supervisorName(r.supervisorId))}</small></div>`};
- $("roomCards").innerHTML=`<h3>Ҳуҷраҳои талабаҳо</h3><div class="room-grid large">${students.map(card).join("")||'<p>Ҳуҷра ёфт нашуд.</p>'}</div><h3 style="margin-top:22px">Ҳуҷраи мураббиён</h3><div class="room-grid large">${staffRooms.map(card).join("")||'<p>Ҳуҷра ёфт нашуд.</p>'}</div>`;
-}
-function openRoom(id){const r=state.rooms.find(x=>x.id===id);if(!r)return;const ss=state.students.filter(s=>s.roomId===id),n=cap(r);let b="";for(let i=1;i<=n;i++){const s=ss.find(x=>Number(x.place)===i);b+=`<div class="bed ${s?"occupied":"free"}" ${s?`onclick="openStudent('${s.id}')"`:""}><span>${i}</span>${s?`<strong>${esc(s.name)}</strong>`:"<small>Ҷой холӣ</small>"}</div>`}
- modal(`<h2>${esc(r.name)}</h2><p>Иқтидор: ${n} | Ишғолшуда: ${ss.length} | Холӣ: ${n-ss.length}</p><p>Мураббӣ: ${esc(supervisorName(r.supervisorId))}</p><div class="beds-grid">${r.type==="supervisor"?"":b}</div>${elevated()?`<div class="action-row">${r.type!=="supervisor"?`<button class="btn btn-primary" onclick="openAssignStudent('${id}')">+ Ҷойгиркунӣ</button>`:""}<button class="btn btn-secondary" onclick="openAssignSupervisor('${id}')">${r.supervisorId?"Иваз кардани мураббӣ":"Таъини мураббӣ"}</button><button class="btn btn-secondary" onclick="openEditRoom('${id}')">Ислоҳи ҳуҷра</button><button class="btn btn-danger" onclick="deleteRoom('${id}')">Нест кардани ҳуҷра</button></div>`:""}`);
-}
-function openAddRoom(){modal(`<h2>Ҳуҷраи нав</h2><div class="form-group"><label>Ном</label><input id="roomName" placeholder="Ҳуҷра №11"></div><div class="form-group"><label>Рақам</label><input id="roomNumber" type="number" min="1"></div><div class="form-group"><label>Иқтидор (ҷойҳо)</label><input id="roomCapacity" type="number" min="1" value="8"></div><div class="form-group"><label>Навъ</label><select id="roomType"><option value="student">Талабаҳо</option><option value="supervisor">Мураббиён</option></select></div><button class="btn btn-primary" onclick="saveNewRoom()">Сохтан</button>`)}
-async function saveNewRoom(){const name=$("roomName").value.trim();if(!name)return err("Номи ҳуҷраро ворид кунед.");await addDoc(collection(db,"rooms"),{name,number:Number($("roomNumber").value)||0,capacity:Number($("roomCapacity").value)||8,type:$("roomType").value,supervisorId:null,createdAt:serverTimestamp()});closeModal();ok("Ҳуҷра сохта шуд.")}
-function openEditRoom(id){const r=state.rooms.find(x=>x.id===id);if(!r)return;modal(`<h2>Ислоҳи ҳуҷра</h2><div class="form-group"><label>Ном</label><input id="roomName" value="${esc(r.name)}"></div><div class="form-group"><label>Рақам</label><input id="roomNumber" type="number" value="${r.number||0}"></div><div class="form-group"><label>Иқтидор (ҷойҳо)</label><input id="roomCapacity" type="number" value="${cap(r)}"></div><div class="form-group"><label>Навъ</label><select id="roomType"><option value="student"${r.type!=="supervisor"?" selected":""}>Талабаҳо</option><option value="supervisor"${r.type==="supervisor"?" selected":""}>Мураббиён</option></select></div><button class="btn btn-primary" onclick="updateRoom('${id}')">Нигоҳ доштан</button>`)}
-async function updateRoom(id){const name=$("roomName").value.trim();if(!name)return err("Номро ворид кунед.");await updateDoc(doc(db,"rooms",id),{name,number:Number($("roomNumber").value)||0,capacity:Number($("roomCapacity").value)||8,type:$("roomType").value});closeModal();ok("Ҳуҷра нав шуд.")}
-async function deleteRoom(id){if(state.students.some(s=>s.roomId===id))return err("Аввал ҳамаи талабаҳоро аз ин ҳуҷра хориҷ кунед.");if(!confirm("Ин ҳуҷра нест карда шавад?"))return;await deleteDoc(doc(db,"rooms",id));closeModal();ok("Ҳуҷра нест карда шуд.")}
-function openAssignStudent(rid){const r=state.rooms.find(x=>x.id===rid);const free=state.students.filter(s=>s.status==="Active"&&!s.roomId),places=Array.from({length:cap(r)},(_,i)=>i+1).filter(p=>!state.students.some(s=>s.status==="Active"&&s.roomId===rid&&Number(s.place)===p));modal(`<h2>Ҷойгиркунӣ</h2><div class="form-group"><label>Талаба</label><select id="assignStudent">${free.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div><div class="form-group"><label>Ҷой</label><select id="assignPlace">${places.map(p=>`<option value="${p}">${p}</option>`).join("")}</select></div><div class="form-group"><label>Мураббӣ</label><select id="assignSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select></div><div class="form-group"><label>Санаи омадан ба хобгоҳ</label><input id="assignStartDate" type="date" value="${todayStr()}"></div><button class="btn btn-primary" onclick="assignStudent('${rid}')">Тасдиқ</button>`)}
-async function assignStudent(rid){const sid=$("assignStudent").value,p=Number($("assignPlace").value),sp=$("assignSupervisor").value,startDate=$("assignStartDate").value||todayStr();if(!sid||!p||!sp)return err("Ҳамаи майдонҳоро пур кунед.");try{await runTransaction(db,async t=>{const sr=doc(db,"students",sid),rr=doc(db,"rooms",rid),lockRef=doc(db,"bed_locks",bedLockId(rid,p)),ss=await t.get(sr),rs=await t.get(rr),lk=await t.get(lockRef);if(!ss.exists())throw Error("Талаба ёфт нашуд.");if(!rs.exists())throw Error("Ҳуҷра ёфт нашуд.");if(p<1||p>cap(rs.data()))throw Error("Ҷойи хоб нодуруст аст.");if(bedTaken(lk,rid,p,sid))throw Error("Ҷой аллакай ишғол шудааст.");t.set(lockRef,{roomId:rid,place:p,studentId:sid,updatedAt:serverTimestamp()});t.update(sr,{roomId:rid,place:p,supervisorId:sp,status:"Active",admissionDate:ss.data()?.admissionDate||startDate,departureDate:null,updatedAt:serverTimestamp()});const pr=doc(collection(db,"placements"));t.set(pr,{studentId:sid,roomId:rid,place:p,supervisorId:sp,action:"assigned",startDate,createdAt:serverTimestamp()});const res=doc(collection(db,"residences"));t.set(res,{studentId:sid,roomId:rid,place:p,supervisorId:sp,startDate,endDate:null,createdAt:serverTimestamp()})});closeModal();ok("Талаба ҷойгир карда шуд.")}catch(e){err(e.message)}}
- 
-/* ---------- attendance journal (tap + / − ) ---------- */
-function attendancePage(){
- if($("journalRows")){renderJournal();return}
- $("content").innerHTML=`<div class="page-head"><div><h2>Давомот</h2><p>Журнали ҳаррӯза — тугмаи + ё − -ро зер кунед</p></div><input id="journalDate" type="date" value="${todayStr()}" onchange="renderJournal()"></div><div class="toolbar"><input id="journalSearch" placeholder="Ҷустуҷӯ аз рӯи ном..." oninput="renderJournal()"></div><div id="journalRows" class="journal-list"></div>`;
- renderJournal();
-}
-function renderJournal(){
- const dateVal=$("journalDate")?.value||todayStr(),x=($("journalSearch")?.value||"").toLowerCase();
- const list=state.students.filter(s=>s.status==="Active"&&(!x||s.name.toLowerCase().includes(x)));
- $("journalRows").innerHTML=list.map(s=>{
-  const rec=state.attendance.find(a=>a.studentId===s.id&&a.date===dateVal);
-  const st=rec?.status;
-  return `<div class="journal-row"><span class="jr-name">${esc(s.name)}<small>${esc(roomName(s.roomId))}</small></span><div class="jr-actions"><button class="jr-btn jr-minus${st==="absent"?" active":""}" onclick="markJournal('${s.id}','${dateVal}','absent')">−</button><button class="jr-btn jr-plus${st==="present"?" active":""}" onclick="markJournal('${s.id}','${dateVal}','present')">+</button><select class="jr-other" onchange="markJournal('${s.id}','${dateVal}',this.value)"><option value="">Дигар</option><option value="permission"${st==="permission"?" selected":""}>Иҷозат</option><option value="sick"${st==="sick"?" selected":""}>Бемор</option></select></div></div>`;
- }).join("")||"<p>Талаба ёфт нашуд.</p>";
-}
-async function markJournal(sid,dateVal,status){if(!status)return;const s=state.students.find(x=>x.id===sid);if(!s)return;await setDoc(doc(db,"attendance",`${sid}_${dateVal}`),{studentId:sid,roomId:s.roomId||null,supervisorId:elevated()?(s.supervisorId||uid()):uid(),date:dateVal,status,note:"",createdAt:serverTimestamp()},{merge:true})}
- 
-/* ---------- violations ---------- */
-function violationsPage(){
- if($("violationRows")){renderViolationRows($("violationSearch")?.value||"");return}
- $("content").innerHTML=`<div class="page-head"><div><h2>Қоидавайронкунӣ</h2></div><button class="btn btn-primary" onclick="openViolation()">+ Сабт</button></div><div class="toolbar"><input id="violationSearch" placeholder="Ҷустуҷӯ аз рӯи ном ё дараҷа..." oninput="renderViolationRows(this.value)"></div><div class="table-wrap"><table><tr><th>Талаба</th><th>Ҳуҷра</th><th>Тавсиф</th><th>Дараҷа</th>${elevated()?"<th>Амал</th>":""}</tr><tbody id="violationRows"></tbody></table></div>`;renderViolationRows("");
-}
-function renderViolationRows(x){x=String(x||"").toLowerCase();const mgr=elevated();const list=state.violations.filter(v=>!x||`${studentName(v.studentId)} ${v.severity||""}`.toLowerCase().includes(x));$("violationRows").innerHTML=list.map(v=>`<tr><td>${esc(studentName(v.studentId))}</td><td>${esc(roomName(v.roomId))}</td><td>${esc(v.description)}</td><td>${esc(v.severity||"—")}</td>${mgr?`<td class="action-cell"><button class="link-btn" onclick="openEditViolation('${v.id}')">Ислоҳ</button><button class="link-btn danger" onclick="deleteViolation('${v.id}')">Нест</button></td>`:""}</tr>`).join("")||`<tr><td colspan="5">Сабт ёфт нашуд.</td></tr>`}
-function openViolation(){modal(`<h2>Қоидавайронкунӣ</h2><div class="form-group"><label>Талаба</label><select id="violationStudent">${state.students.filter(s=>s.status==="Active").map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></div><div class="form-group"><label>Дараҷа</label><select id="violationSeverity"><option>Одатӣ</option><option>Муҳим</option><option>Ҷиддӣ</option></select></div><div class="form-group"><label>Тавсиф</label><textarea id="violationDescription"></textarea></div><button class="btn btn-primary" onclick="saveViolation()">Сабт</button>`)}
-async function saveViolation(){const sid=$("violationStudent").value,s=state.students.find(x=>x.id===sid),d=$("violationDescription").value.trim();if(!s||!d)return err("Тавсифро ворид кунед.");await addDoc(collection(db,"violations"),{studentId:sid,roomId:s.roomId||null,supervisorId:elevated()?(s.supervisorId||uid()):uid(),description:d,severity:$("violationSeverity").value,createdAt:serverTimestamp()});closeModal();ok("Сабт шуд.")}
-function openEditViolation(id){const v=state.violations.find(x=>x.id===id);if(!v)return;modal(`<h2>Ислоҳи қоидавайронкунӣ</h2><div class="form-group"><label>Талаба</label><input value="${esc(studentName(v.studentId))}" disabled></div><div class="form-group"><label>Дараҷа</label><select id="violationSeverity"><option${v.severity==="Одатӣ"?" selected":""}>Одатӣ</option><option${v.severity==="Муҳим"?" selected":""}>Муҳим</option><option${v.severity==="Ҷиддӣ"?" selected":""}>Ҷиддӣ</option></select></div><div class="form-group"><label>Тавсиф</label><textarea id="violationDescription">${esc(v.description||"")}</textarea></div><button class="btn btn-primary" onclick="updateViolation('${id}')">Нигоҳ доштан</button>`)}
-async function updateViolation(id){const d=$("violationDescription").value.trim();if(!d)return err("Тавсифро ворид кунед.");await updateDoc(doc(db,"violations",id),{description:d,severity:$("violationSeverity").value});closeModal();ok("Тағйирот нигоҳ дошта шуд.")}
-async function deleteViolation(id){if(!confirm("Ин сабт нест карда шавад?"))return;await deleteDoc(doc(db,"violations",id));ok("Сабт нест карда шуд.")}
- 
-/* ---------- cleanliness (with leaderboard) ---------- */
-function cleanlinessPage(){
- const byRoom={};state.cleanliness.forEach(x=>{(byRoom[x.roomId]=byRoom[x.roomId]||[]).push(x.total||0)});
- const board=Object.entries(byRoom).map(([rid,scores])=>({rid,avg:scores.reduce((a,b)=>a+b,0)/scores.length})).sort((a,b)=>b.avg-a.avg);
- const medal=i=>["🥇","🥈","🥉"][i]||`${i+1}.`;
- $("content").innerHTML=`<div class="page-head"><div><h2>Озмуни тозагӣ</h2></div><button class="btn btn-primary" onclick="openCleanliness()">+ Арзёбӣ</button></div>
- <div class="section-card"><h3>Рейтинги ҳуҷраҳо</h3>${board.length?`<div class="leaderboard">${board.map((b,i)=>`<div class="leaderboard-row"><span class="lb-rank">${medal(i)}</span><span class="lb-name">${esc(roomName(b.rid))}</span><span class="lb-bar"><span style="width:${Math.round(b.avg/50*100)}%"></span></span><span class="lb-score">${b.avg.toFixed(1)}/50</span></div>`).join("")}</div>`:"<p>Ҳанӯз арзёбӣ нест.</p>"}</div>
- <div class="section-card"><h3>Таърихи арзёбиҳо</h3><div class="table-wrap"><table><tr><th>Сана</th><th>Ҳуҷра</th><th>Хол</th><th>Мураббӣ</th></tr>${state.cleanliness.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(roomName(x.roomId))}</td><td>${x.total||0}/50</td><td>${esc(supervisorName(x.supervisorId))}</td></tr>`).join("")||'<tr><td colspan="4">Маълумот нест.</td></tr>'}</table></div></div>`;
-}
-function openCleanliness(){modal(`<h2>Арзёбии тозагӣ</h2><div class="form-group"><label>Сана</label><input id="cleanDate" type="date" value="${todayStr()}"></div><div class="form-group"><label>Ҳуҷра</label><select id="cleanRoom">${state.rooms.filter(r=>r.type==="student").map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></div>${["Фарш","Катҳо","Тиреза","Санитария","Тартиби умумӣ"].map((x,i)=>`<div class="form-group"><label>${x}</label><input id="clean${i+1}" type="number" min="0" max="10" value="10"></div>`).join("")}<button class="btn btn-primary" onclick="saveCleanliness()">Сабт</button>`)}
-async function saveCleanliness(){const v=[1,2,3,4,5].map(i=>Number($("clean"+i).value));if(v.some(x=>x<0||x>10))return err("Ҳар меъёр 0–10 бошад.");await addDoc(collection(db,"cleanliness_inspections"),{roomId:$("cleanRoom").value,supervisorId:uid(),date:$("cleanDate").value,criteria:v,total:v.reduce((a,b)=>a+b,0),createdAt:serverTimestamp()});closeModal();ok("Арзёбӣ сабт шуд.")}
- 
-/* ---------- duty roster + daily stage confirmations ---------- */
-function rosterPage(){
- const canEdit=elevated(),tk=todayKey();
- $("content").innerHTML=`<div class="page-head"><div><h2>Навбатдорӣ</h2><p>Навбатдории ҳафтаинаи мураббиён</p></div></div>
- <div class="section-card"><h3>Ҷадвали навбатдорӣ</h3><div class="table-wrap"><table><tr><th>Рӯз</th><th>Мураббӣ(ҳо)</th>${canEdit?"<th>Амал</th>":""}</tr>${Object.keys(DAY_LABELS).map(k=>{const rec=state.roster.find(x=>x.id===k);const names=(rec?.supervisorIds||[]).map(supervisorName).map(esc).join(", ")||"—";return `<tr class="${k===tk?"today-row":""}"><td>${DAY_LABELS[k]}${k===tk?" 🔔":""}</td><td>${names}</td>${canEdit?`<td><button class="link-btn" onclick="openEditRoster('${k}')">Ислоҳ</button></td>`:""}</tr>`}).join("")}</table></div></div>
- <div class="section-card"><h3>Фаъолиятҳои имрӯза</h3>${renderStagesBoard()}</div>`;
-}
-function openEditRoster(k){const rec=state.roster.find(x=>x.id===k);modal(`<h2>Навбатдории ${DAY_LABELS[k]}</h2><div class="form-group"><label>Мураббиён</label>${state.supervisors.map(s=>`<label class="checkbox-row"><input type="checkbox" class="roster-check" value="${s.id}"${(rec?.supervisorIds||[]).includes(s.id)?" checked":""}>${esc(s.name||s.email)}</label>`).join("")}</div><div class="form-group"><label>Оғоз</label><input id="dutyStart" type="time" value="${esc(rec?.startTime||"")}"></div><div class="form-group"><label>Анҷом</label><input id="dutyEnd" type="time" value="${esc(rec?.endTime||"")}"></div><div class="form-group"><label>Номи навбат</label><input id="dutyTitle" value="${esc(rec?.title||"Навбатдорӣ")}"></div><button class="btn btn-primary" onclick="saveRoster('${k}')">Нигоҳ доштан</button>`)}
-async function saveRoster(k){const ids=[...document.querySelectorAll(".roster-check:checked")].map(x=>x.value);const start=$("dutyStart")?.value||"";const end=$("dutyEnd")?.value||"";const title=$("dutyTitle")?.value.trim()||"Навбатдорӣ";await setDoc(doc(db,"duty_roster",k),{id:k,day:k,supervisorIds:ids,startTime:start,endTime:end,title,updatedAt:serverTimestamp()},{merge:true});closeModal();ok("Навбатдорӣ нигоҳ дошта шуд.")}
-function renderStagesBoard(){
- const stages=state.stages?.list?.length?state.stages.list:DEFAULT_STAGES;
- const ts=todayStr(),canManage=elevated();
- return `<div class="stage-list">${stages.map(st=>{const conf=state.stageConfirms.find(x=>x.id===`${ts}_${st.key}`);return `<div class="stage-row${conf?" confirmed":""}"><span>${esc(st.label)}</span>${conf?`<small>✅ ${esc(conf.confirmedByName||"")}</small>`:`<button class="btn btn-secondary" onclick="confirmStage('${st.key}','${attrStr(st.label)}')">Тасдиқ кардан</button>`}</div>`}).join("")}</div>${canManage?'<button class="btn btn-secondary" style="margin-top:12px" onclick="openEditStages()">Ислоҳи рӯйхати марҳалаҳо</button>':""}`;
-}
-async function confirmStage(key,label){await setDoc(doc(db,"stage_confirmations",`${todayStr()}_${key}`),{date:todayStr(),stageKey:key,label,confirmedBy:uid(),confirmedByName:state.profile?.name||state.profile?.email,createdAt:serverTimestamp()});ok("Тасдиқ шуд.")}
-function openEditStages(){const stages=state.stages?.list?.length?state.stages.list:DEFAULT_STAGES;modal(`<h2>Марҳалаҳои рӯз</h2><div class="form-group"><label>Ҳар марҳала дар як сатр нависед</label><textarea id="stagesText" rows="6">${stages.map(s=>esc(s.label)).join("\n")}</textarea></div><button class="btn btn-primary" onclick="saveStages()">Нигоҳ доштан</button>`)}
-async function saveStages(){const lines=$("stagesText").value.split("\n").map(x=>x.trim()).filter(Boolean);if(!lines.length)return err("Камаш як марҳала нависед.");const list=lines.map((label,i)=>({key:"s"+i,label}));await setDoc(doc(db,"app_settings","daily_stages"),{list},{merge:false});closeModal();ok("Рӯйхати марҳалаҳо нав шуд.")}
- 
-/* ---------- admin daily schedule + wake settings ---------- */
-function openDailyScheduleManager(){
- const rows=state.dailySchedule.map(a=>`<div class="schedule-row"><b>${esc(a.title)}</b><span>${esc(a.startTime)}</span><button class="link-btn danger" onclick="deleteDailySchedule('${a.id}')">Нест</button></div>`).join("")||"<p>Ҳанӯз ҷадвал нест.</p>";
- modal(`<h2>Фаъолиятҳои ҳаррӯза</h2><div class="schedule-list">${rows}</div><hr><div class="form-group"><label>Номи фаъолият</label><input id="dailyTitle" placeholder="Масалан: Дарс тайёркунӣ"></div><div class="form-group"><label>Вақт</label><input id="dailyTime" type="time"></div><div class="form-group"><label>Рӯзҳо</label><div class="days-checks">${Object.entries(DAY_LABELS).map(([k,v])=>`<label class="checkbox-row"><input type="checkbox" class="daily-day" value="${k}" checked>${v}</label>`).join("")}</div></div><button class="btn btn-primary" onclick="saveDailySchedule()">Илова кардан</button>`);
-}
-async function saveDailySchedule(){const title=$("dailyTitle").value.trim(),startTime=$("dailyTime").value,days=[...document.querySelectorAll(".daily-day:checked")].map(x=>x.value);if(!title||!startTime||!days.length)return err("Ном, вақт ва рӯзҳоро пур кунед.");await addDoc(collection(db,"daily_schedule"),{title,startTime,days,enabled:true,createdBy:uid(),createdAt:serverTimestamp()});closeModal();ok("Фаъолият ба ҷадвал илова шуд.");}
-async function deleteDailySchedule(id){if(!confirm("Ин фаъолият нест карда шавад?"))return;await deleteDoc(doc(db,"daily_schedule",id));openDailyScheduleManager();}
-function openWakeManager(){
- const list=[...state.wakeConfirms].sort((a,b)=>(a.confirmedAt||"").localeCompare(b.confirmedAt||""));
- modal(`<h2>🌅 Вақти бедоршавӣ</h2><div class="form-group"><label>Вақти умумии бедоршавӣ</label><input id="wakeTime" type="time" value="${esc(state.wakeSettings?.time||"06:30")}"></div><button class="btn btn-primary" onclick="saveWakeManager()">Нигоҳ доштан</button>
- <h3 style="margin-top:20px">Бедоршавии имрӯза</h3><div class="table-wrap"><table><tr><th>Ном</th><th>Вақт</th></tr>${list.map(m=>`<tr><td>${esc(m.userName||"—")}</td><td>${chatTime(m.confirmedAt)}</td></tr>`).join("")||'<tr><td colspan="2">Ҳанӯз ҳеҷ кас тасдиқ накардааст.</td></tr>'}</table></div>`);
-}
-async function saveWakeManager(){const time=$("wakeTime").value;if(!time)return err("Вақтро интихоб кунед.");await setDoc(doc(db,"app_settings","wake_schedule"),{time,updatedAt:serverTimestamp(),updatedBy:uid()},{merge:true});closeModal();ok("Вақти бедоршавӣ нигоҳ дошта шуд.");}
- 
-/* ---------- tea recipe menu ---------- */
-function teaPage(){
- $("content").innerHTML=`<div class="page-head"><div><h2>Менюи чойнӯшӣ</h2><p>Рецептҳои умумии чойнӯшӣ</p></div>${elevated()?'<button class="btn btn-primary" onclick="openAddTea()">+ Рецепти нав</button>':""}</div><div id="teaList" class="tea-grid"></div>`;
- renderTeaList();
-}
-function renderTeaList(){const el=$("teaList");if(!el)return;el.innerHTML=state.teaRecipes.map(r=>`<div class="tea-card" onclick="openTeaRecipe('${r.id}')"><h3>🍵 ${esc(r.name)}</h3><p>${esc((r.ingredients||"").slice(0,90))}${(r.ingredients||"").length>90?"…":""}</p></div>`).join("")||"<p>Ҳанӯз рецепт нест.</p>"}
-function openAddTea(){modal(`<h2>Рецепти нав</h2><div class="form-group"><label>Ном</label><input id="teaName"></div><div class="form-group"><label>Маводҳо</label><textarea id="teaIngredients"></textarea></div><div class="form-group"><label>Тарзи тайёркунӣ</label><textarea id="teaSteps"></textarea></div><button class="btn btn-primary" onclick="saveTea()">Сабт</button>`)}
-async function saveTea(){const name=$("teaName").value.trim();if(!name)return err("Номро ворид кунед.");await addDoc(collection(db,"tea_recipes"),{name,ingredients:$("teaIngredients").value.trim(),steps:$("teaSteps").value.trim(),createdBy:uid(),createdAt:serverTimestamp()});closeModal();ok("Рецепт илова шуд.")}
-function openTeaRecipe(id){const r=state.teaRecipes.find(x=>x.id===id);if(!r)return;modal(`<h2>🍵 ${esc(r.name)}</h2><h3>Маводҳо</h3><p>${esc(r.ingredients||"—").replaceAll("\n","<br>")}</p><h3>Тарзи тайёркунӣ</h3><p>${esc(r.steps||"—").replaceAll("\n","<br>")}</p>${elevated()?`<div class="action-row"><button class="btn btn-danger" onclick="deleteTea('${id}')">Нест кардан</button></div>`:""}`)}
-async function deleteTea(id){if(!confirm("Ин рецепт нест карда шавад?"))return;await deleteDoc(doc(db,"tea_recipes",id));closeModal();ok("Рецепт нест карда шуд.")}
- 
-/* ---------- staff chat (manager + supervisors + head) ---------- */
-function chatPage(){
- if($("chatBox")){renderChat();return}
- const myName=state.profile?.name||state.profile?.email||"Корбар";
- $("content").innerHTML=`<div class="chat-page">
-   <div class="chat-card">
-     <div class="chat-header">
-       <div class="chat-avatar"><span>💬</span><i class="chat-online-dot"></i></div>
-       <div class="chat-header-text"><h2>Чати хобгоҳ</h2><p><span class="chat-status-dot"></span> Муоширати дохилии Manager ва мураббиён</p></div>
-       <button class="chat-history-btn" type="button" title="Навтарин паёмҳо" onclick="document.getElementById('chatBox')?.scrollTo({top:document.getElementById('chatBox').scrollHeight,behavior:'smooth'})">↻</button>
-     </div>
-     <div class="chat-box" id="chatBox"></div>
-     <div class="chat-composer">
-       <button class="chat-add-btn" type="button" title="Илова" aria-label="Илова">+</button>
-       <div class="chat-input-wrap"><input id="chatInput" autocomplete="off" placeholder="Паём нависед..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></div>
-       <button class="chat-send-btn" type="button" aria-label="Фиристодан" onclick="sendChat()">➤</button>
-     </div>
-     <div class="chat-footer-note">Шумо ҳамчун <b>${esc(myName)}</b> паём мефиристед.</div>
-   </div>
- </div>`;
- renderChat();
-}
-function chatTime(v){if(!v)return"Ҳозир";const d=v?.toDate?v.toDate():new Date(v);return isNaN(d)?"Ҳозир":d.toLocaleTimeString("tg-TJ",{hour:"2-digit",minute:"2-digit"})}
-function chatInitial(name){const x=String(name||"?").trim();return esc(x.charAt(0).toUpperCase()||"?")}
-function renderChat(){
- const box=$("chatBox");if(!box)return;
- const msgs=state.chat||[];
- box.innerHTML=msgs.map(m=>{const mine=m.senderId===uid();return `<div class="chat-row${mine?" mine":""}">
-   ${mine?"":`<div class="chat-mini-avatar">${chatInitial(m.senderName)}</div>`}
-   <div class="chat-msg${mine?" mine":""}">
-     ${mine?"":`<div class="chat-sender">${esc(m.senderName||"—")}</div>`}
-     <div class="chat-text">${esc(m.text||"").replaceAll("\n","<br>")}</div>
-     <div class="chat-meta">${chatTime(m.createdAt)} ${mine?"✓✓":""}</div>
-   </div>
- </div>`}).join("")||`<div class="chat-empty"><div class="chat-empty-icon">💬</div><h3>Ҳанӯз паём нест</h3><p>Паёми аввалро ба гурӯҳи хобгоҳ фиристед.</p></div>`;
- box.scrollTop=box.scrollHeight;
-}
-async function sendChat(){const inp=$("chatInput"),v=inp.value.trim();if(!v)return;inp.value="";try{await addDoc(collection(db,"chat_messages"),{text:v,senderId:uid(),senderName:state.profile?.name||state.profile?.email,role:state.profile?.role,createdAt:serverTimestamp()});}catch(e){inp.value=v;err(e.message||"Паём фиристода нашуд.")}}
- 
-/* ---------- supervisors (invite + promote to head) ---------- */
-function supervisorsPage(){
- if(!elevated()&&!isHead()){$("content").innerHTML=`<div class="section-card"><h2>Мураббӣ</h2><p>Ҳуҷраҳо: ${(state.profile.assignedRoomIds||[]).map(roomName).map(esc).join(", ")||"—"}</p></div>`;return}
- const mgr=elevated();
- $("content").innerHTML=`<div class="page-head"><div><h2>Мураббиён</h2><p>Идоракунии мураббиён</p></div>${mgr?'<button class="btn btn-primary" onclick="openAddSupervisor()">+ Мураббии нав</button>':""}</div><div class="table-wrap"><table><tr><th>Ном</th><th>Email</th><th>Телефон</th><th>Ҳуҷраҳо</th><th>Нақш</th>${mgr?"<th>Амал</th>":""}</tr>${state.supervisors.map(s=>`<tr><td>${esc(s.name||"—")}</td><td>${esc(s.email||"—")}</td><td>${esc(s.phone||"—")}</td><td>${(s.assignedRoomIds||[]).map(roomName).map(esc).join(", ")||"—"}</td><td>${roleLabel(s.role||"supervisor")}</td>${mgr?`<td><button class="link-btn" onclick="toggleHeadRole('${s.id}','${s.role==="head"?"supervisor":"head"}')">${s.role==="head"?"Бозгардонидан ба мураббӣ":"Таъин чун Сармураббӣ"}</button></td>`:""}</tr>`).join("")}</table></div>`;
-}
-function openAddSupervisor(){modal(`<h2>Мураббии нав</h2><div class="form-group"><label>Ном</label><input id="inviteName"></div><div class="form-group"><label>Email</label><input id="inviteEmail" type="email"></div><div class="form-group"><label>Телефон</label><input id="invitePhone"></div><div class="form-group"><label>Ҳуҷраҳо</label>${state.rooms.filter(r=>r.type!=="supervisor").map(r=>`<label class="checkbox-row"><input type="checkbox" class="invite-room-checkbox" value="${r.id}">${esc(r.name)}</label>`).join("")}</div><button class="btn btn-primary" onclick="createSupervisorInvitation()">Сохтани даъват</button>`)}
-async function createSupervisorInvitation(){const name=$("inviteName").value.trim(),email=$("inviteEmail").value.trim(),phone=$("invitePhone").value.trim(),rooms=[...document.querySelectorAll(".invite-room-checkbox:checked")].map(x=>x.value);if(!name||!email)return err("Ном ва email-ро пур кунед.");if(!rooms.length)return err("Ҳуҷра интихоб кунед.");const code=inviteCode();await setDoc(doc(db,"invitations",code),{name,email,phone,roomIds:rooms,role:"supervisor",status:"pending",createdBy:uid(),createdAt:serverTimestamp()});closeModal();modal(`<h2>Даъват сохта шуд ✅</h2><div class="invite-code">${code}</div><p>Email: <b>${esc(email)}</b></p><button class="btn btn-primary" onclick="closeModal()">Хуб</button>`)}
-async function toggleHeadRole(sid,newRole){await updateDoc(doc(db,"users",sid),{role:newRole});ok(newRole==="head"?"Ба сармураббӣ таъин шуд.":"Ба мураббии оддӣ баргардонида шуд.")}
-function openAssignSupervisor(roomId){modal(`<h2>Таъини мураббӣ</h2><select id="roomSupervisor">${state.supervisors.map(s=>`<option value="${s.id}">${esc(s.name||s.email)}</option>`).join("")}</select><button class="btn btn-primary" onclick="assignSupervisorToRoom('${roomId}')">Сабт</button>`)}
-async function assignSupervisorToRoom(roomId){
- const sid=$("roomSupervisor").value;
- const room=state.rooms.find(x=>x.id===roomId);
- const oldSid=room?.supervisorId;
- await updateDoc(doc(db,"rooms",roomId),{supervisorId:sid});
- const r=doc(db,"users",sid),s=await getDoc(r);
- if(s.exists())await updateDoc(r,{assignedRoomIds:[...new Set([...(s.data().assignedRoomIds||[]),roomId])]});
- if(oldSid&&oldSid!==sid){
-  const or_=doc(db,"users",oldSid),os=await getDoc(or_);
-  if(os.exists())await updateDoc(or_,{assignedRoomIds:(os.data().assignedRoomIds||[]).filter(x=>x!==roomId)});
- }
- closeModal();ok("Мураббӣ таъин шуд.")
-}
- 
-/* ---------- routing ---------- */
-function renderPage(){
- const t={dashboard:["Dashboard","Идоракунии хобгоҳ"],students:["Талабаҳо","Идоракунии талабаҳо"],rooms:["Ҳуҷраҳо","Ҷойҳои хоб"],attendance:["Давомот","Журнали ҳаррӯза"],violations:["Қоидавайронкунӣ","Назорати қоидаҳо"],cleanliness:["Озмуни тозагӣ","Арзёбии ҳуҷраҳо"],roster:["Навбатдорӣ","Навбатдории мураббиён"],tea:["Менюи чойнӯшӣ","Рецептҳои умумӣ"],chat:["Чат","Барои роҳбарият ва мураббиён"],supervisors:["Мураббиён","Идоракунии мураббиён"]};
- $("title").textContent=t[state.page]?.[0]||"Dashboard";$("subtitle").textContent=t[state.page]?.[1]||"";
- document.querySelectorAll("#nav [data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===state.page));
- ({dashboard:dashboardPage,students:studentsPage,rooms:roomsPage,attendance:attendancePage,violations:violationsPage,cleanliness:cleanlinessPage,roster:rosterPage,tea:teaPage,chat:chatPage,supervisors:supervisorsPage}[state.page]||dashboardPage)();
-}
- 
-onAuthStateChanged(auth,async user=>{
- if(!user){clearListeners();state.user=null;state.profile=null;renderLogin();return}
- try{
-  state.user=user;const p=await getDoc(doc(db,"users",user.uid));if(!p.exists())throw Error("Профили корбар вуҷуд надорад.");state.profile={id:user.uid,...p.data()};
-  if(!["manager","supervisor","head"].includes(state.profile.role))throw Error("Нақши корбар нодуруст аст.");
-  shell();await seedRooms();startListening();requestNotifications();ensureActiveDutyLog().catch(e=>console.warn(e));renderPage();
- }catch(e){console.error(e);err(e.message);await signOut(auth);renderLogin()}
+
+// Global PWA prompt holder
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const banner = document.getElementById("pwa-install-banner");
+  if (banner) banner.style.display = "flex";
 });
- 
-if("serviceWorker"in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(e=>console.warn("SW registration failed:",e))})}
- 
-Object.assign(window,{login,logout,renderLogin,renderSupervisorRegistration,registerSupervisor,closeModal,
- openAddStudent,createStudent,openStudent,openEditStudent,updateStudent,deleteStudent,openTransferStudent,confirmTransfer,removeFromRoom,renderStudentRows,
- openRoom,renderRoomCards,openAddRoom,saveNewRoom,openEditRoom,updateRoom,deleteRoom,openAssignStudent,assignStudent,
- renderJournal,markJournal,
- openViolation,saveViolation,openEditViolation,updateViolation,deleteViolation,renderViolationRows,
- openCleanliness,saveCleanliness,
- openActivity,saveActivity,openDailyScheduleManager,saveDailySchedule,deleteDailySchedule,openWakeManager,saveWakeManager,confirmWake,finishDuty,
- openEditRoster,saveRoster,confirmStage,openEditStages,saveStages,
- openAddTea,saveTea,openTeaRecipe,deleteTea,
- sendChat,
- openAddSupervisor,createSupervisorInvitation,toggleHeadRole,openAssignSupervisor,assignSupervisorToRoom});
- 
+
+// Render Shell and Page View
+function renderApp() {
+  const state = store.state;
+  const t = (k) => store.t(k);
+  const root = document.getElementById("app-root");
+  if (!root) return;
+
+  // Apply theme
+  document.documentElement.setAttribute("data-theme", state.theme);
+
+  const roleLabels = {
+    manager: t('role_manager'),
+    head: t('role_head'),
+    supervisor: t('role_supervisor'),
+    student: t('role_student')
+  };
+
+  const currentRoleLabel = roleLabels[state.activeRole] || t('role_manager');
+
+  root.innerHTML = `
+    <div id="app-layout">
+      <!-- Sidebar Overlay for mobile -->
+      <div id="sidebar-overlay" class="sidebar-overlay" style="display:none;" onclick="window.khobgoh.toggleMobileSidebar()"></div>
+
+      <!-- Left Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Brand Header: Clicking returns to Dashboard (Requirement 1) -->
+        <div class="brand" onclick="window.khobgoh.navigate('dashboard')" style="cursor:pointer;" title="Ба саҳифаи асосӣ (Dashboard)">
+          <div class="brand-icon">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div>
+            <div class="brand-title">${t('brand_title')}</div>
+            <div class="brand-subtitle">${t('brand_subtitle')}</div>
+          </div>
+        </div>
+
+        <nav class="nav-links">
+          <button class="nav-link ${state.currentPage === 'dashboard' ? 'active' : ''}" onclick="window.khobgoh.navigate('dashboard')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            ${t('nav_dashboard')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'students' ? 'active' : ''}" onclick="window.khobgoh.navigate('students')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            ${t('nav_students')}
+            <span class="badge">${state.students.length}</span>
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'rooms' ? 'active' : ''}" onclick="window.khobgoh.navigate('rooms')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7h18v10H3z"/><path d="M6 17v4"/><path d="M18 17v4"/></svg>
+            ${t('nav_rooms')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'attendance' ? 'active' : ''}" onclick="window.khobgoh.navigate('attendance')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            ${t('nav_attendance')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'activities' ? 'active' : ''}" onclick="window.khobgoh.navigate('activities')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            ${t('nav_activities')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'violations' ? 'active' : ''}" onclick="window.khobgoh.navigate('violations')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            ${t('nav_violations')}
+            ${state.violations.filter(v => v.status === 'pending').length > 0 ? `<span class="badge" style="background:#fee2e2; color:#b91c1c;">${state.violations.filter(v => v.status === 'pending').length}</span>` : ''}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'cleanliness' ? 'active' : ''}" onclick="window.khobgoh.navigate('cleanliness')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+            ${t('nav_cleanliness')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'roster' ? 'active' : ''}" onclick="window.khobgoh.navigate('roster')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+            ${t('nav_roster')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'tea' ? 'active' : ''}" onclick="window.khobgoh.navigate('tea')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            ${t('nav_tea')}
+          </button>
+
+          <button class="nav-link ${state.currentPage === 'settings' ? 'active' : ''}" onclick="window.khobgoh.navigate('settings')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            ${t('nav_settings')}
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="user-profile-card">
+            <div class="user-avatar">${currentRoleLabel[0]}</div>
+            <div class="user-info">
+              <div class="user-name">${currentRoleLabel}</div>
+              <div class="user-role-badge">Ҳолати фаъол</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="main-content">
+        <!-- Topbar: Logo / Title also returns to Dashboard on click (Requirement 1) -->
+        <header class="topbar">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-menu" onclick="window.khobgoh.toggleMobileSidebar()" style="display:none;">
+              ☰
+            </button>
+            <div onclick="window.khobgoh.navigate('dashboard')" style="cursor:pointer; display:flex; align-items:center; gap:8px;" title="Баргаштан ба Dashboard">
+              <img src="assets/dormitory-logo.png" style="width:28px; height:28px; border-radius:6px;">
+              <span style="font-weight:800; font-size:15px; color:var(--text-main);">Хобгоҳ</span>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:10px;">
+            <!-- Language Quick Switcher -->
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.toggleLanguage()" title="Ивази забон (Language)">
+              🌐 ${state.lang.toUpperCase()}
+            </button>
+
+            <!-- Theme Quick Switcher -->
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.toggleTheme()" title="Рӯшан / Торик (Theme)">
+              ${state.theme === 'light' ? '🌙' : '☀️'}
+            </button>
+          </div>
+        </header>
+
+        <!-- Dynamic Page View -->
+        <div id="view-container">
+          ${renderCurrentPageView(state.currentPage)}
+        </div>
+      </main>
+    </div>
+  `;
+
+  // Responsive check
+  if (window.innerWidth <= 860) {
+    const menuBtn = document.getElementById("btn-toggle-menu");
+    if (menuBtn) menuBtn.style.display = "inline-flex";
+  }
+}
+
+function renderCurrentPageView(page) {
+  switch (page) {
+    case "dashboard": return renderDashboard();
+    case "students": return renderStudents();
+    case "rooms": return renderRooms();
+    case "attendance": return renderAttendance();
+    case "activities": return renderActivities();
+    case "violations": return renderViolations();
+    case "cleanliness": return renderCleanliness();
+    case "roster": return renderRoster();
+    case "tea": return renderTea();
+    case "settings": return renderSettings();
+    default: return renderDashboard();
+  }
+}
+
+// Global actions exposed on window.khobgoh
+window.khobgoh = {
+  navigate(page) {
+    store.setPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
+    if (sidebar) sidebar.classList.remove("open");
+    if (overlay) overlay.style.display = "none";
+  },
+
+  toggleMobileSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
+    if (sidebar && overlay) {
+      const isOpen = sidebar.classList.toggle("open");
+      overlay.style.display = isOpen ? "block" : "none";
+    }
+  },
+
+  toggleTheme() {
+    const next = store.state.theme === "light" ? "dark" : "light";
+    store.setTheme(next);
+  },
+
+  changeTheme(theme) {
+    store.setTheme(theme);
+  },
+
+  toggleLanguage() {
+    const next = store.state.lang === "tg" ? "en" : "tg";
+    store.setLang(next);
+    showToast(next === 'tg' ? "Забон ба Тоҷикӣ иваз карда шуд" : "Language switched to English", "info");
+  },
+
+  changeLanguage(lang) {
+    store.setLang(lang);
+  },
+
+  changeRole(role) {
+    store.setRole(role);
+    showToast(`Нақш ба «${role}» иваз шуд!`, "info");
+  },
+
+  resetToDemo() {
+    store.resetToDemo();
+    showToast("Ҳамаи додаҳо ба ҳолати намунавӣ барқарор шуданд!", "success");
+  },
+
+  exportJsonData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(store.exportData());
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `khobgoh_backup_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast("Нусхаи эҳтиётӣ бо муваффақият боргирӣ шуд!", "success");
+  },
+
+  importJsonData(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      if (store.importData(content)) {
+        showToast("Додаҳо бо муваффақият ворид карда шуданд!", "success");
+      } else {
+        showToast("Хатогӣ дар воридоти файл. Формат нодуруст аст.", "error");
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  // PWA Install prompt trigger
+  async promptPWAInstall() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        showToast("Барнома бо муваффақият дар экрани шумо насб карда мешавад!", "success");
+      }
+      deferredPrompt = null;
+    } else {
+      // Guide user
+      alert("Барои насби барнома дар телефон:\n1. Дар браузери Chrome/Safari тугмаи менюи се нуқтаро (ё тугмаи Поделиться) пахш намоед.\n2. «Добавить на главный экран» (Add to Home screen)-ро интихоб кунед.");
+    }
+  },
+
+  // Activities handlers
+  changeActDay(day) {
+    window.khobgoh.selectedActDay = day;
+    renderApp();
+  },
+
+  changeActClass(cls) {
+    window.khobgoh.selectedActClass = cls;
+    renderApp();
+  },
+
+  openAddActivityModal() {
+    if (!store.canManageActivities()) return;
+
+    const days = [
+      { key: "mon", label: "Душанбе" },
+      { key: "tue", label: "Сешанбе" },
+      { key: "wed", label: "Чоршанбе" },
+      { key: "thu", label: "Панҷшанбе" },
+      { key: "fri", label: "Ҷумъа" },
+      { key: "sat", label: "Шанбе" },
+      { key: "sun", label: "Якшанбе" }
+    ];
+
+    const body = `
+      <form id="addActForm" onsubmit="window.khobgoh.submitNewActivity(event)">
+        <div class="form-group">
+          <label class="form-label">Рӯзи ҳафта</label>
+          <select id="actDay" class="form-control">
+            ${days.map(d => `<option value="${d.key}">${d.label}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Синф / Гурӯҳ</label>
+          <select id="actClass" class="form-control">
+            <option value="Синфи 8">Синфи 8</option>
+            <option value="Синфи 9">Синфи 9</option>
+            <option value="Синфи 10">Синфи 10</option>
+            <option value="Синфи 11">Синфи 11</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Вақти гузаронидан (масалан: 16:00 - 17:30)</label>
+          <input type="text" id="actTime" class="form-control" required placeholder="15:00 - 16:30">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Номи фаъолият / Дарс</label>
+          <input type="text" id="actName" class="form-control" required placeholder="Масалан: Тайёрии вазифаи хонагӣ, Китобхонӣ...">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Макон (Ҷойгиршавӣ)</label>
+          <input type="text" id="actLocation" class="form-control" placeholder="Китобхона, Майдончаи варзишӣ...">
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('addActForm').requestSubmit()">Сабт кардан</button>
+    `;
+
+    openModal("Иловаи фаъолият ба ҷадвал", body, footer);
+  },
+
+  submitNewActivity(e) {
+    e.preventDefault();
+    const day = document.getElementById("actDay")?.value;
+    const cls = document.getElementById("actClass")?.value;
+    const time = document.getElementById("actTime")?.value.trim();
+    const activity = document.getElementById("actName")?.value.trim();
+    const location = document.getElementById("actLocation")?.value.trim();
+
+    if (!day || !cls || !time || !activity) return;
+
+    store.addActivity({ day, class: cls, time, activity, location });
+    closeModal();
+    showToast("Фаъолияти нав бо муваффақият илова шуд!", "success");
+  },
+
+  deleteActivity(id) {
+    if (!store.canManageActivities()) return;
+    if (confirm("Оё ин фаъолиятро аз ҷадвал нест кардан мехоҳед?")) {
+      store.deleteActivity(id);
+      showToast("Фаъолият аз ҷадвал хориҷ шуд!", "info");
+    }
+  },
+
+  // Room Leader handler
+  openSetRoomLeaderModal(roomId) {
+    if (!store.canManageStudents()) return;
+    const roomStudents = store.state.students.filter(s => s.room === roomId);
+    const currentLeaderId = store.state.roomLeaders[roomId];
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби Сардори Ҳуҷраи ${roomId}:</label>
+        <select id="roomLeaderSelect" class="form-control">
+          ${roomStudents.map(s => `
+            <option value="${s.id}" ${currentLeaderId === s.id ? 'selected' : ''}>
+              ${s.name} (${s.course}, Ҷойи №${s.bed})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitSetRoomLeader('${roomId}')">Таъин кардан</button>
+    `;
+
+    openModal(`Таъин кардани Сардори Ҳуҷраи ${roomId}`, body, footer);
+  },
+
+  submitSetRoomLeader(roomId) {
+    const studentId = document.getElementById("roomLeaderSelect")?.value;
+    if (!studentId) return;
+
+    store.setRoomLeader(roomId, studentId);
+    closeModal();
+    const student = store.state.students.find(s => s.id === studentId);
+    showToast(`${student?.name} сардори Ҳуҷраи ${roomId} таъин шуд!`, "success");
+  },
+
+  // Supervisor quarters assignment
+  openAssignSupervisorModal() {
+    if (!store.canManageStudents()) return;
+    const supervisors = store.state.supervisors;
+    const supervisorRooms = store.state.rooms.filter(r => r.type === 'supervisor');
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Мураббӣ</label>
+        <select id="assignSupSelect" class="form-control">
+          ${supervisors.map(s => `<option value="${s.id}">${s.name} (${s.phone})</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Ҳуҷра</label>
+          <select id="assignSupRoom" class="form-control">
+            ${supervisorRooms.map(r => `<option value="${r.id}">${r.name} (4 ҷойӣ)</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ҷой (1-4)</label>
+          <input type="number" id="assignSupBed" min="1" max="4" value="1" class="form-control">
+        </div>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitAssignSupervisor()">Таъин кардан</button>
+    `;
+
+    openModal("Таъин кардани мураббӣ ба ҳуҷра", body, footer);
+  },
+
+  submitAssignSupervisor() {
+    const supId = document.getElementById("assignSupSelect")?.value;
+    const roomId = document.getElementById("assignSupRoom")?.value;
+    const bedNum = document.getElementById("assignSupBed")?.value;
+
+    if (!supId || !roomId || !bedNum) return;
+
+    store.assignSupervisor(supId, roomId, bedNum);
+    closeModal();
+    showToast("Мураббӣ ба ҳуҷра таъин шуд!", "success");
+  },
+
+  // Cleanliness Inspector
+  openSetInspectorModal() {
+    if (!store.canManageStudents()) return;
+    const supervisors = store.state.supervisors;
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби масъули тозагӣ:</label>
+        <select id="inspectorSelect" class="form-control">
+          ${supervisors.map(s => `
+            <option value="${s.id}" ${store.state.cleanlinessInspectorId === s.id ? 'selected' : ''}>
+              ${s.name} (${s.phone})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitSetInspector()">Тасдиқ</button>
+    `;
+
+    openModal("Таъин кардани масъули озмуни тозагӣ", body, footer);
+  },
+
+  submitSetInspector() {
+    const id = document.getElementById("inspectorSelect")?.value;
+    if (!id) return;
+    store.setCleanlinessInspector(id);
+    closeModal();
+    const sup = store.state.supervisors.find(s => s.id === id);
+    showToast(`${sup?.name} масъули тозагӣ таъин шуд!`, "success");
+  },
+
+  setCleanlinessInspector(id) {
+    store.setCleanlinessInspector(id);
+    showToast("Масъули тозагӣ сабт шуд!", "success");
+  },
+
+  // Students filtering
+  filterStudents() {
+    const search = document.getElementById("studentSearchInput")?.value.toLowerCase().trim() || "";
+    const room = document.getElementById("studentRoomFilter")?.value || "";
+    const status = document.getElementById("studentStatusFilter")?.value || "";
+
+    const rows = document.querySelectorAll("#studentsTable tbody tr");
+    rows.forEach(row => {
+      const name = row.getAttribute("data-name") || "";
+      const sid = row.getAttribute("data-id") || "";
+      const sroom = row.getAttribute("data-room") || "";
+      const sstatus = row.getAttribute("data-status") || "";
+
+      const matchesSearch = !search || name.includes(search) || sid.includes(search);
+      const matchesRoom = !room || sroom === room;
+      const matchesStatus = !status || sstatus === status;
+
+      row.style.display = matchesSearch && matchesRoom && matchesStatus ? "" : "none";
+    });
+  },
+
+  // Modals for Students
+  openAddStudentModal() {
+    if (!store.canManageStudents()) {
+      showToast("Танҳо Мудир ё Сармураббӣ метавонанд донишҷӯёнро дохил кунанд.", "error");
+      return;
+    }
+
+    const rooms = store.state.rooms.filter(r => r.type === 'student');
+    const t = (k) => store.t(k);
+
+    const body = `
+      <form id="addStudentForm" onsubmit="window.khobgoh.submitNewStudent(event)">
+        <div class="form-group">
+          <label class="form-label">${t('students_col_name')} *</label>
+          <input type="text" id="newStdName" class="form-control" required placeholder="Масалан: Ҷамшед Раҳимов">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">${t('students_col_room')} *</label>
+            <select id="newStdRoom" class="form-control" required>
+              ${rooms.map(r => `<option value="${r.id}">${r.name} (${r.capacity} ҷойӣ)</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">${t('students_col_bed')} (1-8) *</label>
+            <input type="number" id="newStdBed" min="1" max="8" value="1" class="form-control" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">${t('students_col_course')}</label>
+            <input type="text" id="newStdCourse" class="form-control" placeholder="Синфи 10-А">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">${t('students_col_phone')}</label>
+            <input type="text" id="newStdPhone" class="form-control" placeholder="+992 900 00 00 00">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ному рақами волидайн (Guardian)</label>
+          <input type="text" id="newStdGuardian" class="form-control" placeholder="Падар/Модар: +992...">
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">${t('cancel')}</button>
+      <button class="btn btn-primary" onclick="document.getElementById('addStudentForm').requestSubmit()">${t('save')}</button>
+    `;
+
+    openModal(t('students_btn_add'), body, footer);
+  },
+
+  submitNewStudent(e) {
+    e.preventDefault();
+    const name = document.getElementById("newStdName")?.value.trim();
+    const room = document.getElementById("newStdRoom")?.value;
+    const bed = document.getElementById("newStdBed")?.value;
+    const course = document.getElementById("newStdCourse")?.value.trim();
+    const phone = document.getElementById("newStdPhone")?.value.trim();
+    const guardian = document.getElementById("newStdGuardian")?.value.trim();
+
+    if (!name || !room || !bed) return;
+
+    store.addStudent({ name, room, bed, course, phone, guardian });
+    closeModal();
+    showToast(`Донишҷӯ ${name} бо муваффақият сабт шуд!`, "success");
+  },
+
+  openAssignBedModal(roomId, bedNum) {
+    if (!store.canManageStudents()) {
+      showToast("Танҳо Мудир ё Сармураббӣ метавонанд ҷойро таъин кунанд.", "error");
+      return;
+    }
+    const unassigned = store.state.students.filter(s => s.room !== roomId || Number(s.bed) !== bedNum);
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби донишҷӯ барои Ҳуҷраи ${roomId}, Ҷойи №${bedNum}:</label>
+        <select id="assignStudentSelect" class="form-control">
+          ${unassigned.map(s => `<option value="${s.id}">${s.name} (${s.room ? 'Ҳуҷраи ' + s.room : 'Бе ҷой'})</option>`).join('')}
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitAssignBed('${roomId}', ${bedNum})">Таъин кардан</button>
+    `;
+
+    openModal(`Таъин кардани ҷой (Ҳуҷраи ${roomId})`, body, footer);
+  },
+
+  submitAssignBed(roomId, bedNum) {
+    const studentId = document.getElementById("assignStudentSelect")?.value;
+    if (!studentId) return;
+
+    store.updateStudent(studentId, { room: roomId, bed: bedNum, status: "Active" });
+    closeModal();
+    showToast(`Ҷойи №${bedNum} ба донишҷӯ бо муваффақият таъин шуд!`, "success");
+  },
+
+  deleteStudent(id) {
+    const s = store.state.students.find(x => x.id === id);
+    if (!s) return;
+    if (confirm(`Оё мутмаин ҳастед, ки ${s.name}-ро хориҷ кардан мехоҳед?`)) {
+      try {
+        store.deleteStudent(id);
+        showToast(`${s.name} аз рӯйхат хориҷ карда шуд!`, "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+  },
+
+  editStudent(id) {
+    if (!store.canManageStudents()) return;
+    const s = store.state.students.find(x => x.id === id);
+    if (!s) return;
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Ному насаб</label>
+        <input type="text" id="editStdName" class="form-control" value="${s.name}">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Ҳуҷра</label>
+          <input type="text" id="editStdRoom" class="form-control" value="${s.room}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ҷой (Bed)</label>
+          <input type="number" id="editStdBed" class="form-control" value="${s.bed}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Курс / Синф</label>
+        <input type="text" id="editStdCourse" class="form-control" value="${s.course || ''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Телефон</label>
+        <input type="text" id="editStdPhone" class="form-control" value="${s.phone || ''}">
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.saveStudentEdits('${s.id}')">Сабт кардан</button>
+    `;
+
+    openModal("Таҳрири маълумоти донишҷӯ", body, footer);
+  },
+
+  saveStudentEdits(id) {
+    const name = document.getElementById("editStdName")?.value.trim();
+    const room = document.getElementById("editStdRoom")?.value.trim();
+    const bed = Number(document.getElementById("editStdBed")?.value);
+    const course = document.getElementById("editStdCourse")?.value.trim();
+    const phone = document.getElementById("editStdPhone")?.value.trim();
+
+    store.updateStudent(id, { name, room, bed, course, phone });
+    closeModal();
+    showToast("Тағйирот сабт шуд!", "success");
+  },
+
+  viewStudentPass(id) {
+    const s = store.state.students.find(x => x.id === id);
+    if (!s) return;
+    const isLeader = store.state.roomLeaders[s.room] === s.id;
+
+    const body = `
+      <div id="studentPassCard" style="border:2px solid var(--emerald-600); border-radius:var(--radius-lg); padding:20px; background:#fff; color:#0f172a; box-shadow:var(--shadow-md);">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--emerald-600); padding-bottom:12px; margin-bottom:16px;">
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:var(--emerald-800);">КОРТИ ХОБГОҲИ ДОНИШҶӮ</h3>
+            <div style="font-size:11px; color:#64748b;">DORMITORY RESIDENT PASS</div>
+          </div>
+          <div style="font-family:var(--font-mono); font-weight:800; color:var(--emerald-700); font-size:14px;">${s.studentId}</div>
+        </div>
+
+        <div style="display:flex; gap:18px; align-items:center;">
+          <div style="width:72px; height:80px; background:#e2e8f0; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:28px; border:1px solid #cbd5e1;">
+            👤
+          </div>
+          <div style="flex:1;">
+            <h2 style="font-size:18px; font-weight:800; margin:0 0 4px 0; display:flex; align-items:center; gap:6px;">
+              <span>${s.name}</span>
+              ${isLeader ? `<span style="font-size:13px;" title="Сардори ҳуҷра">👑 Сардори ҳуҷра</span>` : ''}
+            </h2>
+            <div style="font-size:13px; color:#475569; margin-bottom:4px;"><b>Синф/Курс:</b> ${s.course}</div>
+            <div style="font-size:13px; color:#475569; margin-bottom:4px;"><b>Ҳуҷра:</b> №${s.room} • <b>Кат (Ҷой):</b> №${s.bed}</div>
+            <div style="font-size:13px; color:#475569;"><b>Санаи қабул:</b> ${s.admissionDate || '2024-09-01'}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; padding-top:12px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; font-size:11px; color:#64748b;">
+          <div>Тамос: ${s.phone || '+992 000 00 00'}</div>
+          <div>Имзои мудир: ____________</div>
+        </div>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Чоп кардан (Print)</button>
+    `;
+
+    openModal("Шаҳодатномаи истиқоматкунанда", body, footer);
+  },
+
+  // Attendance
+  changeAttDate(date) {
+    window.khobgoh.selectedAttDate = date;
+    renderApp();
+  },
+
+  setAttStatus(date, studentId, status) {
+    store.setAttendance(date, studentId, status);
+    renderApp();
+  },
+
+  markAllPresent(date) {
+    store.markAllPresent(date);
+    showToast("Ҳамаи донишҷӯён «Ҳаст» сабт шуданд!", "success");
+    renderApp();
+  },
+
+  // Violations: ALL supervisors have access to ALL students (Requirement 9)
+  openAddViolationModal() {
+    const students = store.state.students;
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби донишҷӯ (аз ҳамаи ҳуҷраҳо)</label>
+        <select id="violStudentSelect" class="form-control">
+          ${students.map(s => `<option value="${s.id}">${s.name} (Ҳуҷраи ${s.room}, Ҷойи №${s.bed} - ${s.course})</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Сабаб ё шарҳи ҳодиса</label>
+        <textarea id="violReason" class="form-control" placeholder="Масалан: Дер омадан ба хобгоҳ, вайрон кардани интизом..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Дараҷаи ҷиддият (Severity)</label>
+        <select id="violSeverity" class="form-control">
+          <option value="low">Огоҳӣ (Low)</option>
+          <option value="medium">Миёна (Medium)</option>
+          <option value="high">Ҷиддӣ (High)</option>
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitViolation()">Сабт кардан</button>
+    `;
+
+    openModal("Сабти қоидавайронкунӣ", body, footer);
+  },
+
+  submitViolation() {
+    const studentId = document.getElementById("violStudentSelect")?.value;
+    const reason = document.getElementById("violReason")?.value.trim();
+    const severity = document.getElementById("violSeverity")?.value;
+
+    const student = store.state.students.find(s => s.id === studentId);
+    if (!student || !reason) return;
+
+    store.addViolation({
+      studentId,
+      studentName: student.name,
+      room: student.room,
+      reason,
+      severity
+    });
+
+    closeModal();
+    showToast("Қоидавайронкунӣ сабт карда шуд!", "info");
+  },
+
+  resolveViolation(id) {
+    store.resolveViolation(id);
+    showToast("Қоидавайронкунӣ ҳал карда шуд!", "success");
+  },
+
+  // Cleanliness 5 Criteria Scoring (Requirements 10 & 11)
+  openRateRoomModal() {
+    if (!store.canRateCleanliness()) {
+      showToast("Танҳо мураббии масъули тозагӣ ва Мудир метавонанд баҳо гузоранд.", "error");
+      return;
+    }
+
+    const rooms = store.state.rooms.filter(r => r.type === 'student');
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби ҳуҷра</label>
+        <select id="rateRoomSelect" class="form-control">
+          ${rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">1. Намуди умумии ҳуҷра (макс. 15 хол)</label>
+          <input type="number" id="rateAppearance" min="0" max="15" step="0.5" value="14" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">2. Ҷевонҳо / Шкафҳо (макс. 10 хол)</label>
+          <input type="number" id="rateWardrobes" min="0" max="10" step="0.5" value="9" class="form-control">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">3. Ҷойи хоб / Катҳо (макс. 10 хол)</label>
+          <input type="number" id="rateBeds" min="0" max="10" step="0.5" value="9" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">4. Чанги ҳуҷра (макс. 10 хол)</label>
+          <input type="number" id="rateDust" min="0" max="10" step="0.5" value="9" class="form-control">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">5. Тароват ва ҳавокашӣ (макс. 5 хол)</label>
+        <input type="number" id="rateAir" min="0" max="5" step="0.5" value="4.5" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Хулоса ва эзоҳи санҷиш</label>
+        <input type="text" id="rateRoomNotes" class="form-control" placeholder="Масалан: Ҳуҷра намунавӣ, либосҳо мураттаб...">
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitRateRoom5()">Сабти холҳо (50)</button>
+    `;
+
+    openModal("Баҳогузории озмуни тозагӣ (5 меъёр)", body, footer);
+  },
+
+  submitRateRoom5() {
+    const room = document.getElementById("rateRoomSelect")?.value;
+    const appearance = document.getElementById("rateAppearance")?.value;
+    const wardrobes = document.getElementById("rateWardrobes")?.value;
+    const beds = document.getElementById("rateBeds")?.value;
+    const dust = document.getElementById("rateDust")?.value;
+    const air = document.getElementById("rateAir")?.value;
+    const notes = document.getElementById("rateRoomNotes")?.value.trim();
+
+    if (!room) return;
+
+    store.rateRoom5(room, appearance, wardrobes, beds, dust, air, notes);
+    closeModal();
+    showToast(`Баҳогузории Ҳуҷраи ${room} бо муваффақият сабт шуд!`, "success");
+  },
+
+  closeModal
+};
+
+// Keyboard shortcut: Escape closes modal (Requirement 5)
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeModal();
+  }
+});
+
+// Auto subscribe to state updates
+store.subscribe(() => {
+  renderApp();
+});
+
+// Initial boot
+document.addEventListener("DOMContentLoaded", () => {
+  renderApp();
+});
