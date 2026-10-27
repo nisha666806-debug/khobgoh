@@ -24,7 +24,46 @@
   <meta name="apple-mobile-web-app-title" content="Хобгоҳ">
   <meta name="application-name" content="Хобгоҳ">
 
-  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/main.css?v=2.5">
+
+  <script>
+    // Fail-safe error boundary for blank screen prevention
+    window.addEventListener('error', function(e) {
+      console.error('Captured window error:', e);
+      const root = document.getElementById('app-root');
+      if (root && (!root.innerHTML || root.innerHTML.trim() === '')) {
+        root.innerHTML = `
+          <div style="padding:28px 20px; font-family:system-ui, -apple-system, sans-serif; text-align:center; max-width:440px; margin:50px auto; background:#ffffff; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.08); border:1px solid #e5e7eb;">
+            <div style="font-size:44px; margin-bottom:12px;">📱</div>
+            <h2 style="color:#111827; margin:0 0 8px 0; font-size:20px; font-weight:800;">Навсозии Барнома</h2>
+            <p style="color:#6b7280; font-size:14px; line-height:1.5; margin:0 0 20px 0;">
+              Барои фаъол шудани нусхаи нави хобгоҳ ва тоза кардани кэши кӯҳна, тугмаи зерро пахш намоед:
+            </p>
+            <button onclick="window.khobgohForceReload()" style="background:#059669; color:#fff; border:none; padding:12px 24px; border-radius:10px; font-weight:700; font-size:15px; cursor:pointer; box-shadow:0 4px 12px rgba(5,150,105,0.3); width:100%;">
+              🔄 Тоза кардан ва кушодани барнома
+            </button>
+          </div>
+        `;
+      }
+    });
+
+    window.khobgohForceReload = function() {
+      if ('caches' in window) {
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+              regs.forEach(r => r.unregister());
+              window.location.reload(true);
+            });
+          } else {
+            window.location.reload(true);
+          }
+        });
+      } else {
+        window.location.reload(true);
+      }
+    };
+  </script>
 </head>
 <body>
   <!-- Main Application Mounting Container -->
@@ -46,14 +85,17 @@
   <div id="toast-container"></div>
 
   <!-- Core App ES Module -->
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=2.5"></script>
 
   <!-- Service Worker registration for PWA & Offline reliability -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('Khobgoh PWA ServiceWorker active:', reg.scope))
+        navigator.serviceWorker.register('sw.js?v=2.5')
+          .then(reg => {
+            reg.update();
+            console.log('Khobgoh PWA ServiceWorker active:', reg.scope);
+          })
           .catch(err => console.debug('ServiceWorker error:', err));
       });
     }

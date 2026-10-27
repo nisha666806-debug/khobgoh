@@ -1,5 +1,5 @@
-// Khobgoh Modern Service Worker v2.4 (with Firebase real-time sync)
-const CACHE_NAME = "khobgoh-pwa-v2.4";
+// Khobgoh Modern Service Worker v2.5 (Network-first for scripts & updates)
+const CACHE_NAME = "khobgoh-pwa-v2.5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,10 +29,11 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+      return cache.addAll(ASSETS).catch(err => console.debug("Asset caching error:", err));
+    })
   );
 });
 
@@ -46,10 +47,35 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   // If fetching Firebase/Google APIs, bypass service worker cache
-  if (e.request.url.includes("firestore.googleapis.com") || e.request.url.includes("identitytoolkit.googleapis.com")) {
+  if (
+    e.request.url.includes("firestore.googleapis.com") ||
+    e.request.url.includes("identitytoolkit.googleapis.com") ||
+    e.request.url.includes("gstatic.com")
+  ) {
     return;
   }
 
+  // Network-first for scripts, styles and html to avoid getting stuck with stale/broken code
+  const isCodeOrHtml = e.request.destination === "script" ||
+                       e.request.destination === "document" ||
+                       e.request.destination === "style";
+
+  if (isCodeOrHtml) {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for images and icons
   e.respondWith(
     caches.match(e.request).then((res) => {
       return res || fetch(e.request).catch(() => caches.match("./index.html"));

@@ -379,7 +379,6 @@ class Store {
     this.saveState();
     syncManager.syncCleanliness(entry);
   }
-  }
 
   // --- Quick Stats helper ---
   getStats() {
