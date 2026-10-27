@@ -1,5 +1,5 @@
-// Khobgoh Modern Service Worker v2.5 (Network-first for scripts & updates)
-const CACHE_NAME = "khobgoh-pwa-v2.5";
+// Khobgoh Modern Service Worker v2.6 (Network-first for scripts & updates)
+const CACHE_NAME = "khobgoh-pwa-v2.6";
 const ASSETS = [
   "./",
   "./index.html",

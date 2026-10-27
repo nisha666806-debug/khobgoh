@@ -225,6 +225,33 @@ function renderApp() {
           </div>
         </header>
 
+        <!-- Prominent Real-time Cloud Sync Banner -->
+        ${syncManager.currentUser ? `
+          <div class="sync-banner sync-banner-success">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">🟢</span>
+              <div>
+                <b>Синхронизатсияи зинда фаъол аст:</b> Пайваст бо <b>${syncManager.currentUser.email}</b> (${currentRoleLabel})
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openUserAccountModal()" style="font-size:12px; padding:4px 10px;">
+              Ҳолати ҳисоб ⚙️
+            </button>
+          </div>
+        ` : `
+          <div class="sync-banner sync-banner-warning">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">☁️</span>
+              <div>
+                <b>Ҳолати офлайн (Синхронизатсия пайваст нест):</b> Барои пайваст шудан ба база ва ҳамзамон дидани амалҳои дигар кормандон ба ҳисоб ворид шавед.
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="window.khobgoh.openLoginModal()" style="font-weight:700; padding:6px 14px; font-size:12px;">
+              🔑 Пайвастшавӣ / Бақайдгирӣ
+            </button>
+          </div>
+        `}
+
         <!-- Dynamic Page View -->
         <div id="view-container">
           ${renderCurrentPageView(state.currentPage)}
@@ -516,6 +543,13 @@ window.khobgoh = {
             <input type="number" id="newSupBed" min="1" max="4" value="1" class="form-control">
           </div>
         </div>
+
+        <div style="margin-top:12px; padding:10px; background:var(--surface-muted); border-radius:var(--radius-md); font-size:13px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="newSupInviteCheck" checked>
+            <span>Эҷоди «Коди даъват» барои бақайдгирии мураббӣ дар системаи абрӣ</span>
+          </label>
+        </div>
       </form>
     `;
 
@@ -527,7 +561,7 @@ window.khobgoh = {
     openModal("Иловаи мураббии нав", body, footer);
   },
 
-  submitNewSupervisor(e) {
+  async submitNewSupervisor(e) {
     e.preventDefault();
     const name = document.getElementById("newSupName")?.value.trim();
     const phone = document.getElementById("newSupPhone")?.value.trim();
@@ -535,10 +569,35 @@ window.khobgoh = {
     const role = document.getElementById("newSupRole")?.value;
     const room = document.getElementById("newSupRoom")?.value;
     const bed = document.getElementById("newSupBed")?.value;
+    const createInvite = document.getElementById("newSupInviteCheck")?.checked;
 
     if (!name || !phone) return;
 
     store.addSupervisor({ name, phone, email, role, room, bed });
+
+    if (createInvite && email && syncManager.currentUser && syncManager.isElevated()) {
+      try {
+        const code = await syncManager.createInvitation({ name, email, phone, roomIds: [room] });
+        closeModal();
+        openModal("Коди даъват сохта шуд ✅", `
+          <div style="text-align:center; padding:12px 0;">
+            <div style="font-size:42px; margin-bottom:8px;">📨</div>
+            <h3 style="margin:0 0 6px 0; font-size:17px; font-weight:800; color:var(--emerald-800);">Даъватнома барои мураббӣ</h3>
+            <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px 0;">
+              Ин коди даъватро ба <b>${name}</b> расонед, то бо воситаи он дар телефон ё компютери худ ворид шавад:
+            </p>
+            <div style="font-size:26px; font-weight:900; letter-spacing:3px; background:var(--surface-muted); padding:12px 18px; border-radius:10px; margin:0 auto 16px auto; border:2px dashed var(--emerald-600); color:var(--emerald-800); display:inline-block;">
+              ${code}
+            </div>
+            <div style="font-size:13px; color:var(--text-muted);">Почтаи электронии таъиншуда: <b>${email}</b></div>
+          </div>
+        `, `<button class="btn btn-primary" onclick="window.khobgoh.closeModal()">Фаҳмо, нусхабардорӣ шуд</button>`);
+        return;
+      } catch (err) {
+        console.warn("Invite creation info:", err);
+      }
+    }
+
     closeModal();
     showToast(`Мураббӣ ${name} бо муваффақият илова шуд!`, "success");
   },
@@ -1223,33 +1282,102 @@ window.khobgoh = {
   },
 
   // Auth & Cloud Sync Modals
-  openLoginModal() {
+  openLoginModal(tab = 'login') {
+    const isLogin = tab === 'login';
+    const isRegister = tab === 'register';
+    const isHelp = tab === 'help';
+
     const body = `
-      <form id="loginForm" onsubmit="window.khobgoh.submitLogin(event)">
-        <div style="text-align:center; margin-bottom:16px;">
-          <img src="assets/dormitory-logo.png" style="width:54px; height:54px; border-radius:12px; margin-bottom:8px;">
-          <h3 style="margin:0; font-size:17px; font-weight:800;">Воридшавӣ ба система</h3>
-          <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Барои синхронизатсияи зинда бо телефонҳои дигар кормандон</p>
-        </div>
+      <div class="auth-tabs">
+        <button class="auth-tab-btn ${isLogin ? 'active' : ''}" onclick="window.khobgoh.openLoginModal('login')">
+          Воридшавӣ
+        </button>
+        <button class="auth-tab-btn ${isRegister ? 'active' : ''}" onclick="window.khobgoh.openLoginModal('register')">
+          Бақайдгирии мураббӣ
+        </button>
+        <button class="auth-tab-btn ${isHelp ? 'active' : ''}" onclick="window.khobgoh.openLoginModal('help')">
+          Ёрӣ ва дастур
+        </button>
+      </div>
 
-        <div class="form-group">
-          <label class="form-label">Email корманд *</label>
-          <input type="email" id="loginEmail" class="form-control" required placeholder="nom@khobgoh.tj">
-        </div>
+      ${isLogin ? `
+        <form id="loginForm" onsubmit="window.khobgoh.submitLogin(event)">
+          <div style="text-align:center; margin-bottom:14px;">
+            <img src="assets/dormitory-logo.png" style="width:48px; height:48px; border-radius:10px; margin-bottom:6px;">
+            <h3 style="margin:0; font-size:16px; font-weight:800;">Воридшавӣ ба базаи ягона</h3>
+            <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Барои синхронизатсияи зинда бо ҳамаи телефонҳои кормандон</p>
+          </div>
 
-        <div class="form-group">
-          <label class="form-label">Парол *</label>
-          <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
+          <div class="form-group">
+            <label class="form-label">Email корманд (Роҳбар ё мураббӣ) *</label>
+            <input type="email" id="loginEmail" class="form-control" required placeholder="nom@khobgoh.tj">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Парол *</label>
+            <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
+          </div>
+
+          <div style="font-size:12px; color:var(--text-muted); margin-top:8px;">
+            Мураббии нав ҳастед? <a href="javascript:void(0)" onclick="window.khobgoh.openLoginModal('register')" style="color:var(--primary); font-weight:700;">Бо коди даъват бақайд гиред →</a>
+          </div>
+        </form>
+      ` : isRegister ? `
+        <form id="regForm" onsubmit="window.khobgoh.submitSupervisorRegistration(event)">
+          <div style="text-align:center; margin-bottom:14px;">
+            <div style="font-size:36px; margin-bottom:4px;">📋</div>
+            <h3 style="margin:0; font-size:16px; font-weight:800;">Бақайдгирии мураббӣ</h3>
+            <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Коди даъватро аз Роҳбар (Manager) гиред</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email мураббӣ *</label>
+            <input type="email" id="regEmail" class="form-control" required placeholder="murabbi@khobgoh.tj">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Коди даъват (Invite Code) *</label>
+            <input type="text" id="regCode" class="form-control" required placeholder="KHG-XXXXXXXX" style="font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label class="form-label">Пароли нав *</label>
+              <input type="password" id="regPassword" class="form-control" required minlength="6" placeholder="камаш 6 аломат">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Такрори парол *</label>
+              <input type="password" id="regPassword2" class="form-control" required minlength="6" placeholder="••••••••">
+            </div>
+          </div>
+        </form>
+      ` : `
+        <div style="padding:4px 0; font-size:13px; line-height:1.6; color:var(--text-main);">
+          <h4 style="margin:0 0 8px 0; color:var(--emerald-800);">Барои чӣ синхронизатсия лозим аст?</h4>
+          <p style="margin:0 0 12px 0;">Ҳангоме ки кормандон ба система ворид мешаванд, ҳар як қайди давомот (ҳозир/ғоиб), қоидавайронкунӣ, ҷойи хоб ва навбатдории чой дар ҳамон сония ба телефони ҳамаи кормандони дигар интиқол меёбад.</p>
+
+          <h4 style="margin:12px 0 6px 0; color:var(--emerald-800);">Тарзи корбарӣ:</h4>
+          <ol style="margin:0; padding-left:18px;">
+            <li><b>Роҳбар (Manager):</b> Бо Email ва пароли роҳбарият ворид мешавад ва метавонад тамоми маълумотҳоро идора кунад.</li>
+            <li><b>Иловаи мураббӣ:</b> Роҳбар дар бахши Мураббиён мураббиро илова карда, барои ӯ «Коди даъват» месозад.</li>
+            <li><b>Мураббиён:</b> Дар ҳамин равзана дар ҷадвали «Бақайдгирии мураббӣ» коди даъват ва почтаи худро навишта, парол интихоб мекунанд.</li>
+          </ol>
         </div>
-      </form>
+      `}
     `;
 
-    const footer = `
+    const footer = isLogin ? `
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
       <button class="btn btn-primary" onclick="document.getElementById('loginForm').requestSubmit()">Ворид шудан</button>
+    ` : isRegister ? `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('regForm').requestSubmit()">Бақайдгирӣ ва воридшавӣ</button>
+    ` : `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.openLoginModal('login')">Ба бахши воридшавӣ</button>
     `;
 
-    openModal("Воридшавӣ (Firebase Auth)", body, footer);
+    openModal("Ҳисоб ва Синхронизатсияи абрӣ", body, footer);
   },
 
   async submitLogin(e) {
@@ -1267,6 +1395,34 @@ window.khobgoh = {
     } catch (err) {
       console.error("Login failed:", err);
       showToast("Хатогӣ дар воридшавӣ: Email ё парол нодуруст аст.", "error");
+    }
+  },
+
+  async submitSupervisorRegistration(e) {
+    e.preventDefault();
+    const email = document.getElementById("regEmail")?.value.trim();
+    const code = document.getElementById("regCode")?.value.trim();
+    const p1 = document.getElementById("regPassword")?.value;
+    const p2 = document.getElementById("regPassword2")?.value;
+
+    if (!email || !code || !p1 || !p2) return;
+    if (p1 !== p2) {
+      showToast("Паролҳо мувофиқат намекунанд!", "error");
+      return;
+    }
+    if (p1.length < 6) {
+      showToast("Парол бояд на камтар аз 6 аломат бошад!", "error");
+      return;
+    }
+
+    try {
+      showToast("Дар ҳоли бақайдгирӣ дар система...", "info");
+      await syncManager.registerSupervisor({ email, code, password: p1 });
+      closeModal();
+      showToast("Мураббӣ бомуваффақият сабт шуд! Синхронизатсия фаъол гардид.", "success");
+    } catch (err) {
+      console.error("Registration error:", err);
+      showToast(err.message || "Хатогӣ дар бақайдгирӣ. Лутфан маълумотро санҷед.", "error");
     }
   },
 
