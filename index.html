@@ -5,17 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Хобгоҳ — Идоракунии хобгоҳ</title>
   
-  <!-- PWA & Mobile Meta Tags -->
+  <!-- Web App Icons (Android & Desktop) -->
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/dormitory-logo.png">
+  
+  <!-- Apple Touch Icons (iPhone & iPad) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="assets/icon-512.png">
+  
+  <!-- PWA Manifest & App Config -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#059669">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Хобгоҳ">
   <meta name="application-name" content="Хобгоҳ">
 
@@ -25,7 +30,7 @@
   <!-- Main Application Mounting Container -->
   <div id="app-root"></div>
 
-  <!-- Reusable Global Modal Dialog (Clicking backdrop closes modal - Requirement 5) -->
+  <!-- Reusable Global Modal Dialog (Clicking backdrop closes modal) -->
   <div id="modal-backdrop" class="modal-backdrop" style="display:none;" onclick="if(event.target === this) window.khobgoh.closeModal()">
     <div class="modal-dialog">
       <div class="modal-header">

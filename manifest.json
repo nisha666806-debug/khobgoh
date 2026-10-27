@@ -1,13 +1,13 @@
 {
-  "id": "khobgoh-dormitory-app",
-  "name": "Хобгоҳ — Dormitory Management",
+  "id": "khobgoh-app-v2",
+  "name": "Хобгоҳ — Идоракунии хобгоҳ",
   "short_name": "Хобгоҳ",
   "description": "Системаи муосири идоракунии хобгоҳ ва донишҷӯён",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#064e3b",
+  "background_color": "#ffffff",
   "theme_color": "#059669",
   "icons": [
     {
@@ -36,7 +36,7 @@
     },
     {
       "src": "assets/dormitory-logo.png",
-      "sizes": "256x256",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }

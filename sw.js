@@ -1,5 +1,5 @@
-// Khobgoh Modern Service Worker v2.2
-const CACHE_NAME = "khobgoh-pwa-v2.2";
+// Khobgoh Modern Service Worker v2.3 (Updated with custom tree-home logo)
+const CACHE_NAME = "khobgoh-pwa-v2.3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -21,7 +21,9 @@ const ASSETS = [
   "./js/views/settings.js",
   "./assets/dormitory-logo.png",
   "./assets/icon-192.png",
-  "./assets/icon-512.png"
+  "./assets/icon-512.png",
+  "./assets/apple-touch-icon.png",
+  "./assets/favicon.png"
 ];
 
 self.addEventListener("install", (e) => {
