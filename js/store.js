@@ -232,6 +232,13 @@ class Store {
     this.saveState();
   }
 
+  // Update Tea duty from any page
+  updateTeaDuty(todayDuty, samovarStatus) {
+    if (todayDuty) this.state.tea.todayDuty = todayDuty;
+    if (samovarStatus) this.state.tea.samovarStatus = samovarStatus;
+    this.saveState();
+  }
+
   // --- Activities CRUD ---
   addActivity(item) {
     const newAct = {

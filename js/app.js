@@ -177,7 +177,19 @@ function renderApp() {
             </div>
           </div>
 
+          <!-- Quick Tea Access across ALL pages -->
           <div style="display:flex; align-items:center; gap:10px;">
+            <button 
+              class="btn btn-secondary btn-sm" 
+              onclick="window.khobgoh.openQuickTeaModal()" 
+              style="display:flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.35); color:var(--emerald-800); font-weight:700;"
+              title="Маълумот ва идоракунии фаврии чойнӯшӣ">
+              <span>🍵</span>
+              <span style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${state.tea.todayDuty.split('(')[0]}
+              </span>
+            </button>
+
             <!-- Language Quick Switcher -->
             <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.toggleLanguage()" title="Ивази забон (Language)">
               🌐 ${state.lang.toUpperCase()}
@@ -1062,6 +1074,87 @@ window.khobgoh = {
     store.rateRoom5(room, appearance, wardrobes, beds, dust, air, notes);
     closeModal();
     showToast(`Баҳогузории Ҳуҷраи ${room} бо муваффақият сабт шуд!`, "success");
+  },
+
+  // Quick Tea Access across ALL pages
+  openQuickTeaModal() {
+    const tea = store.state.tea;
+    const rooms = store.state.rooms.filter(r => r.type === 'student');
+    const canManage = store.canManageStudents();
+
+    const body = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- Quick Status Cards -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div style="padding:14px; background:var(--surface-muted); border-radius:var(--radius-md); text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">🍵</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">НАВБАТДОРИ ИМРӮЗ</div>
+            <div style="font-weight:800; font-size:14px; color:var(--text-main); margin-top:2px;">${tea.todayDuty}</div>
+          </div>
+
+          <div style="padding:14px; background:var(--surface-muted); border-radius:var(--radius-md); text-align:center;">
+            <div style="font-size:24px; margin-bottom:4px;">⚡️</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:700;">ҲОЛАТИ САМОВОР</div>
+            <div style="font-weight:800; font-size:14px; color:var(--emerald-600); margin-top:2px;">${tea.samovarStatus}</div>
+          </div>
+        </div>
+
+        <!-- Meal Times Quick Strip -->
+        <div style="padding:12px; background:rgba(16, 185, 129, 0.08); border-radius:var(--radius-md); border:1px solid rgba(16, 185, 129, 0.2);">
+          <div style="font-size:12px; font-weight:700; color:var(--emerald-900); margin-bottom:6px;">⏰ Вақтҳои чойнӯшӣ:</div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--emerald-800);">
+            <span>🌅 Субҳ: 07:00-08:00</span>
+            <span>🌇 Шом: 17:30-18:30</span>
+            <span>🌙 Шаб: 21:00-21:30</span>
+          </div>
+        </div>
+
+        ${canManage ? `
+          <!-- Quick Assignment form for Admin / Supervisors -->
+          <div style="border-top:1px solid var(--border); padding-top:14px;">
+            <label class="form-label" style="font-weight:700;">Тағйири фаврии навбатдорӣ ё ҳолат:</label>
+            <div class="form-group" style="margin-bottom:10px;">
+              <input type="text" id="quickTeaDutyInput" class="form-control" value="${tea.todayDuty}" placeholder="Масалан: Ҳуҷраи 103 (Муҳаммадҷон Ғафуров)">
+            </div>
+            <div class="form-group">
+              <select id="quickSamovarStatusSelect" class="form-control">
+                <option value="Омода ва гарм" ${tea.samovarStatus === 'Омода ва гарм' ? 'selected' : ''}>⚡️ Омода ва гарм</option>
+                <option value="Дар ҳоли ҷӯшидан" ${tea.samovarStatus === 'Дар ҳоли ҷӯшидан' ? 'selected' : ''}>🔥 Дар ҳоли ҷӯшидан</option>
+                <option value="Хомӯш" ${tea.samovarStatus === 'Хомӯш' ? 'selected' : ''}>❄️ Хомӯш</option>
+              </select>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.navigate('tea'); window.khobgoh.closeModal();">
+        Бахши пурраи ошхона ➔
+      </button>
+      ${canManage ? `
+        <button class="btn btn-primary" onclick="window.khobgoh.saveQuickTeaDuty()">
+          Сабт кардан
+        </button>
+      ` : `
+        <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">
+          Пӯшидан
+        </button>
+      `}
+    `;
+
+    openModal("🍵 Назорати фаврии чойнӯшӣ ва самовор", body, footer);
+  },
+
+  saveQuickTeaDuty() {
+    const duty = document.getElementById("quickTeaDutyInput")?.value.trim();
+    const status = document.getElementById("quickSamovarStatusSelect")?.value;
+
+    if (duty) {
+      store.updateTeaDuty(duty, status);
+      closeModal();
+      showToast("Маълумоти чойнӯшӣ нав карда шуд!", "success");
+    }
   },
 
   closeModal
