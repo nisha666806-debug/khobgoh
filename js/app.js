@@ -1301,12 +1301,14 @@ window.khobgoh = {
       </div>
 
       ${isLogin ? `
-        <form id="loginForm" onsubmit="window.khobgoh.submitLogin(event)">
+        <form id="loginForm" onsubmit="window.khobgoh.submitLogin(event); return false;">
           <div style="text-align:center; margin-bottom:14px;">
             <img src="assets/dormitory-logo.png" style="width:48px; height:48px; border-radius:10px; margin-bottom:6px;">
             <h3 style="margin:0; font-size:16px; font-weight:800;">Воридшавӣ ба базаи ягона</h3>
             <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Барои синхронизатсияи зинда бо ҳамаи телефонҳои кормандон</p>
           </div>
+
+          <div id="loginErrorBox" style="display:none; padding:10px 14px; margin-bottom:12px; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; font-size:13px; color:#991b1b; line-height:1.4;"></div>
 
           <div class="form-group">
             <label class="form-label">Email корманд (Роҳбар ё мураббӣ) *</label>
@@ -1314,7 +1316,10 @@ window.khobgoh = {
           </div>
 
           <div class="form-group">
-            <label class="form-label">Парол *</label>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label class="form-label">Парол *</label>
+              <a href="javascript:void(0)" onclick="window.khobgoh.forgotPassword()" style="font-size:12px; color:var(--primary); text-decoration:none;">Фаромӯш кардед?</a>
+            </div>
             <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
           </div>
 
@@ -1323,12 +1328,14 @@ window.khobgoh = {
           </div>
         </form>
       ` : isRegister ? `
-        <form id="regForm" onsubmit="window.khobgoh.submitSupervisorRegistration(event)">
+        <form id="regForm" onsubmit="window.khobgoh.submitSupervisorRegistration(event); return false;">
           <div style="text-align:center; margin-bottom:14px;">
             <div style="font-size:36px; margin-bottom:4px;">📋</div>
             <h3 style="margin:0; font-size:16px; font-weight:800;">Бақайдгирии мураббӣ</h3>
             <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Коди даъватро аз Роҳбар (Manager) гиред</p>
           </div>
+
+          <div id="regErrorBox" style="display:none; padding:10px 14px; margin-bottom:12px; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; font-size:13px; color:#991b1b; line-height:1.4;"></div>
 
           <div class="form-group">
             <label class="form-label">Email мураббӣ *</label>
@@ -1368,10 +1375,10 @@ window.khobgoh = {
 
     const footer = isLogin ? `
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
-      <button class="btn btn-primary" onclick="document.getElementById('loginForm').requestSubmit()">Ворид шудан</button>
+      <button class="btn btn-primary" id="loginSubmitBtn" onclick="window.khobgoh.submitLogin()">Ворид шудан</button>
     ` : isRegister ? `
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
-      <button class="btn btn-primary" onclick="document.getElementById('regForm').requestSubmit()">Бақайдгирӣ ва воридшавӣ</button>
+      <button class="btn btn-primary" id="regSubmitBtn" onclick="window.khobgoh.submitSupervisorRegistration()">Бақайдгирӣ ва воридшавӣ</button>
     ` : `
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>
       <button class="btn btn-primary" onclick="window.khobgoh.openLoginModal('login')">Ба бахши воридшавӣ</button>
@@ -1381,11 +1388,25 @@ window.khobgoh = {
   },
 
   async submitLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById("loginEmail")?.value.trim();
+    if (e && e.preventDefault) e.preventDefault();
+    const email = document.getElementById("loginEmail")?.value?.trim();
     const password = document.getElementById("loginPassword")?.value;
+    const errorBox = document.getElementById("loginErrorBox");
+    const submitBtn = document.getElementById("loginSubmitBtn");
 
-    if (!email || !password) return;
+    if (!email || !password) {
+      if (errorBox) {
+        errorBox.textContent = "Лутфан Email ва паролро ворид намоед.";
+        errorBox.style.display = "block";
+      }
+      return;
+    }
+
+    if (errorBox) errorBox.style.display = "none";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Дар ҳоли санҷиш...";
+    }
 
     try {
       showToast("Дар ҳоли санҷиш ва пайвастшавӣ...", "info");
@@ -1394,25 +1415,113 @@ window.khobgoh = {
       showToast("Шумо бомуваффақият ворид шудед! Синхронизатсияи зинда фаъол шуд.", "success");
     } catch (err) {
       console.error("Login failed:", err);
-      showToast("Хатогӣ дар воридшавӣ: Email ё парол нодуруст аст.", "error");
+      let message = "Email ё парол нодуруст аст.";
+      if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
+        message = "Email ё парол нодуруст аст (ё чунин корбар ҳанӯз дар база вуҷуд надорад).";
+      } else if (err.code === "auth/invalid-email") {
+        message = "Формати Email нодуруст аст.";
+      } else if (err.code === "auth/network-request-failed") {
+        message = "Пайвасти интернет бо сервер қатъ шуд.";
+      } else if (err.message) {
+        message = err.message;
+      }
+
+      if (errorBox) {
+        errorBox.innerHTML = `
+          <div style="font-weight:700;">❌ ${message}</div>
+          <div style="margin-top:8px; font-size:12px; color:#4b5563;">
+            Оё мехоҳед ин ҳисобро ҳамчун роҳбари нав (Manager) сабти ном кунед?
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="window.khobgoh.registerDirectManager('${email}')" style="margin-top:8px; width:100%; font-size:12px;">
+            ✨ Сабти номи ин ҳисоб дар база
+          </button>
+        `;
+        errorBox.style.display = "block";
+      }
+      showToast(message, "error");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Ворид шудан";
+      }
+    }
+  },
+
+  async registerDirectManager(email) {
+    const password = document.getElementById("loginPassword")?.value;
+    const errorBox = document.getElementById("loginErrorBox");
+
+    if (!email || !password || password.length < 6) {
+      if (errorBox) {
+        errorBox.textContent = "Парол бояд камаш 6 аломат дошта бошад.";
+        errorBox.style.display = "block";
+      }
+      return;
+    }
+
+    try {
+      showToast("Дар ҳоли сабти ҳисоб...", "info");
+      await syncManager.registerManager(email, password);
+      closeModal();
+      showToast("Ҳисоби нав бомуваффақият сохта шуд ва ворид гардид!", "success");
+    } catch (err) {
+      console.error("Direct register error:", err);
+      if (errorBox) {
+        errorBox.innerHTML = `❌ Хатогӣ дар сабти ном: ${err.message || 'Лутфан маълумотро санҷед'}`;
+        errorBox.style.display = "block";
+      }
+    }
+  },
+
+  async forgotPassword() {
+    const email = document.getElementById("loginEmail")?.value?.trim();
+    if (!email) {
+      alert("Лутфан аввал Email-и худро нависед.");
+      return;
+    }
+    try {
+      await syncManager.resetPassword(email);
+      alert(`Истинод барои барқароркунии парол ба ${email} фиристода шуд. Лутфан почтаатонро санҷед.`);
+    } catch (err) {
+      alert("Хатогӣ: " + (err.message || "Истинод фиристода нашуд."));
     }
   },
 
   async submitSupervisorRegistration(e) {
-    e.preventDefault();
-    const email = document.getElementById("regEmail")?.value.trim();
-    const code = document.getElementById("regCode")?.value.trim();
+    if (e && e.preventDefault) e.preventDefault();
+    const email = document.getElementById("regEmail")?.value?.trim();
+    const code = document.getElementById("regCode")?.value?.trim();
     const p1 = document.getElementById("regPassword")?.value;
     const p2 = document.getElementById("regPassword2")?.value;
+    const errorBox = document.getElementById("regErrorBox");
+    const submitBtn = document.getElementById("regSubmitBtn");
 
-    if (!email || !code || !p1 || !p2) return;
+    if (!email || !code || !p1 || !p2) {
+      if (errorBox) {
+        errorBox.textContent = "Ҳамаи майдонҳоро пур кунед.";
+        errorBox.style.display = "block";
+      }
+      return;
+    }
     if (p1 !== p2) {
-      showToast("Паролҳо мувофиқат намекунанд!", "error");
+      if (errorBox) {
+        errorBox.textContent = "Паролҳо мувофиқат намекунанд!";
+        errorBox.style.display = "block";
+      }
       return;
     }
     if (p1.length < 6) {
-      showToast("Парол бояд на камтар аз 6 аломат бошад!", "error");
+      if (errorBox) {
+        errorBox.textContent = "Парол бояд на камтар аз 6 аломат бошад!";
+        errorBox.style.display = "block";
+      }
       return;
+    }
+
+    if (errorBox) errorBox.style.display = "none";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Дар ҳоли бақайдгирӣ...";
     }
 
     try {
@@ -1422,7 +1531,16 @@ window.khobgoh = {
       showToast("Мураббӣ бомуваффақият сабт шуд! Синхронизатсия фаъол гардид.", "success");
     } catch (err) {
       console.error("Registration error:", err);
-      showToast(err.message || "Хатогӣ дар бақайдгирӣ. Лутфан маълумотро санҷед.", "error");
+      if (errorBox) {
+        errorBox.textContent = "Хатогӣ: " + (err.message || "Коди даъват ё email нодуруст аст.");
+        errorBox.style.display = "block";
+      }
+      showToast(err.message || "Хатогӣ дар бақайдгирӣ.", "error");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Бақайдгирӣ ва воридшавӣ";
+      }
     }
   },
 

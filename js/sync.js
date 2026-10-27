@@ -321,6 +321,20 @@ class SyncManager {
     return await this.fb.signInWithEmailAndPassword(this.fb.auth, email, password);
   }
 
+  async registerManager(email, password) {
+    if (!this.fb) {
+      this.fb = await import("./firebase.js");
+    }
+    return await this.fb.createUserWithEmailAndPassword(this.fb.auth, email.trim(), password);
+  }
+
+  async resetPassword(email) {
+    if (!this.fb) {
+      this.fb = await import("./firebase.js");
+    }
+    return await this.fb.sendPasswordResetEmail(this.fb.auth, email.trim());
+  }
+
   async logout() {
     if (this.fb) {
       return await this.fb.signOut(this.fb.auth);

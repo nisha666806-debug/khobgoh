@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Хобгоҳ">
   <meta name="application-name" content="Хобгоҳ">
 
-  <link rel="stylesheet" href="css/main.css?v=2.6">
+  <link rel="stylesheet" href="css/main.css?v=2.7">
 
   <script>
     // Fail-safe error boundary for blank screen prevention
@@ -85,13 +85,13 @@
   <div id="toast-container"></div>
 
   <!-- Core App ES Module -->
-  <script type="module" src="js/app.js?v=2.6"></script>
+  <script type="module" src="js/app.js?v=2.7"></script>
 
   <!-- Service Worker registration for PWA & Offline reliability -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=2.6')
+        navigator.serviceWorker.register('sw.js?v=2.7')
           .then(reg => {
             reg.update();
             console.log('Khobgoh PWA ServiceWorker active:', reg.scope);
