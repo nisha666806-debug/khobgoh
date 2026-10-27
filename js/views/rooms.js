@@ -90,17 +90,25 @@ export function renderRooms() {
 
       <!-- Section 2: Supervisor Quarters (4 beds each) -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
-        <h2 style="font-size:18px; font-weight:700; margin:0; display:flex; align-items:center; gap:8px;">
-          👥 ${t('rooms_supervisor_rooms')}
-        </h2>
+        <div>
+          <h2 style="font-size:18px; font-weight:700; margin:0; display:flex; align-items:center; gap:8px;">
+            👥 ${t('rooms_supervisor_rooms')}
+          </h2>
+          <small style="color:var(--text-muted);">Идоракунии мураббиён, ҳуҷраҳо ва ҷойҳо</small>
+        </div>
         ${canManage ? `
-          <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openAssignSupervisorModal()">
-            + Таъин кардани мураббӣ ба ҳуҷра
-          </button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="window.khobgoh.openAddSupervisorModal()">
+              + Иловаи мураббии нав
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openAssignSupervisorModal()">
+              Тақсимот ба ҳуҷра
+            </button>
+          </div>
         ` : ''}
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:18px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:18px; margin-bottom:28px;">
         ${supervisorRooms.map(room => {
           const roomSupervisors = supervisors.filter(s => s.room === room.id);
 
@@ -124,7 +132,7 @@ export function renderRooms() {
 
                   if (sup) {
                     return `
-                      <div class="bed-slot" style="background:#e0e7ff; color:#3730a3; border:1px solid #818cf8;" title="${sup.name} (${sup.phone})">
+                      <div class="bed-slot" style="background:#e0e7ff; color:#3730a3; border:1px solid #818cf8; cursor:pointer;" title="${sup.name} (${sup.phone})">
                         <span style="font-size:11px; font-weight:800;">№${bedNum}</span>
                         <span style="font-size:10px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sup.name.split(' ')[0]}</span>
                       </div>
@@ -142,6 +150,62 @@ export function renderRooms() {
             </div>
           `;
         }).join('')}
+      </div>
+
+      <!-- Supervisor Directory & Management Table -->
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:12px; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+        📋 Рӯйхати мураббиён (${supervisors.length} нафар)
+      </h2>
+
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Ному насаб</th>
+              <th>Нақш / Вазифа</th>
+              <th>Ҳуҷраи кори</th>
+              <th>Ҷой (Кат)</th>
+              <th>Телефон</th>
+              <th>Email</th>
+              ${canManage ? `<th style="text-align:right;">Амалҳо</th>` : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${supervisors.map(sup => `
+              <tr>
+                <td>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:34px; height:34px; border-radius:50%; background:var(--indigo-500); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">
+                      ${sup.name[0]}
+                    </div>
+                    <strong>${sup.name}</strong>
+                  </div>
+                </td>
+                <td>
+                  <span class="status-pill ${sup.role === 'head' ? 'status-active' : 'status-permission'}">
+                    ${sup.role === 'head' ? 'Сармураббӣ' : 'Мураббӣ'}
+                  </span>
+                </td>
+                <td><strong>Ҳуҷраи ${sup.room}</strong></td>
+                <td>№ ${sup.bed || 1}</td>
+                <td style="font-family:var(--font-mono); font-size:13px;">${sup.phone || '—'}</td>
+                <td style="font-size:13px; color:var(--text-muted);">${sup.email || '—'}</td>
+                ${canManage ? `
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex; gap:6px;">
+                      <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openEditSupervisorModal('${sup.id}')" title="Таҳрир">
+                        ✏️
+                      </button>
+                      <button class="btn btn-danger btn-sm" onclick="window.khobgoh.deleteSupervisor('${sup.id}')" title="Нобуд кардан">
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                ` : ''}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     </div>
   `;

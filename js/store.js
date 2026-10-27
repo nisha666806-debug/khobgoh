@@ -166,6 +166,46 @@ class Store {
     this.saveState();
   }
 
+  // --- Supervisors CRUD ---
+  addSupervisor(sup) {
+    if (!this.canManageStudents()) {
+      throw new Error("Танҳо Мудир ё Сармураббӣ метавонанд мураббии навро илова кунанд.");
+    }
+    const id = "sup_" + Date.now();
+    const newSup = {
+      id,
+      name: sup.name,
+      phone: sup.phone || "",
+      email: sup.email || "",
+      role: sup.role || "supervisor",
+      room: sup.room || "201",
+      bed: Number(sup.bed || 1)
+    };
+    this.state.supervisors.push(newSup);
+    this.saveState();
+    return newSup;
+  }
+
+  updateSupervisor(id, updates) {
+    if (!this.canManageStudents()) {
+      throw new Error("Танҳо Мудир ё Сармураббӣ метавонанд маълумоти мураббиро таҳрир кунанд.");
+    }
+    this.state.supervisors = this.state.supervisors.map(s => s.id === id ? { ...s, ...updates } : s);
+    this.saveState();
+  }
+
+  deleteSupervisor(id) {
+    if (!this.canManageStudents()) {
+      throw new Error("Танҳо Мудир метавонад мураббиро хориҷ кунад.");
+    }
+    this.state.supervisors = this.state.supervisors.filter(s => s.id !== id);
+    // If deleted supervisor was cleanliness inspector, reset
+    if (this.state.cleanlinessInspectorId === id) {
+      this.state.cleanlinessInspectorId = this.state.supervisors[0]?.id || "sup_1";
+    }
+    this.saveState();
+  }
+
   // Set Room Leader
   setRoomLeader(roomId, studentId) {
     if (!this.canManageStudents()) {

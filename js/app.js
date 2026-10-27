@@ -439,6 +439,158 @@ window.khobgoh = {
     showToast(`${student?.name} сардори Ҳуҷраи ${roomId} таъин шуд!`, "success");
   },
 
+  // Supervisor CRUD Modals
+  openAddSupervisorModal() {
+    if (!store.canManageStudents()) return;
+    const supervisorRooms = store.state.rooms.filter(r => r.type === 'supervisor');
+
+    const body = `
+      <form id="addSupForm" onsubmit="window.khobgoh.submitNewSupervisor(event)">
+        <div class="form-group">
+          <label class="form-label">Ному насаби мураббӣ *</label>
+          <input type="text" id="newSupName" class="form-control" required placeholder="Масалан: Ҷамшед Саидов">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Телефон *</label>
+            <input type="text" id="newSupPhone" class="form-control" required placeholder="+992 900 00 00 00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="newSupEmail" class="form-control" placeholder="jamshed@khobgoh.tj">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Вазифа / Нақш</label>
+            <select id="newSupRole" class="form-control">
+              <option value="supervisor">Мураббӣ</option>
+              <option value="head">Сармураббӣ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ҳуҷра</label>
+            <select id="newSupRoom" class="form-control">
+              ${supervisorRooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ҷой (1-4)</label>
+            <input type="number" id="newSupBed" min="1" max="4" value="1" class="form-control">
+          </div>
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('addSupForm').requestSubmit()">Сабт кардан</button>
+    `;
+
+    openModal("Иловаи мураббии нав", body, footer);
+  },
+
+  submitNewSupervisor(e) {
+    e.preventDefault();
+    const name = document.getElementById("newSupName")?.value.trim();
+    const phone = document.getElementById("newSupPhone")?.value.trim();
+    const email = document.getElementById("newSupEmail")?.value.trim();
+    const role = document.getElementById("newSupRole")?.value;
+    const room = document.getElementById("newSupRoom")?.value;
+    const bed = document.getElementById("newSupBed")?.value;
+
+    if (!name || !phone) return;
+
+    store.addSupervisor({ name, phone, email, role, room, bed });
+    closeModal();
+    showToast(`Мураббӣ ${name} бо муваффақият илова шуд!`, "success");
+  },
+
+  openEditSupervisorModal(id) {
+    if (!store.canManageStudents()) return;
+    const sup = store.state.supervisors.find(s => s.id === id);
+    if (!sup) return;
+    const supervisorRooms = store.state.rooms.filter(r => r.type === 'supervisor');
+
+    const body = `
+      <form id="editSupForm" onsubmit="window.khobgoh.saveSupervisorEdits(event, '${sup.id}')">
+        <div class="form-group">
+          <label class="form-label">Ному насаб</label>
+          <input type="text" id="editSupName" class="form-control" value="${sup.name}" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Телефон</label>
+            <input type="text" id="editSupPhone" class="form-control" value="${sup.phone || ''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="editSupEmail" class="form-control" value="${sup.email || ''}">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Вазифа</label>
+            <select id="editSupRole" class="form-control">
+              <option value="supervisor" ${sup.role === 'supervisor' ? 'selected' : ''}>Мураббӣ</option>
+              <option value="head" ${sup.role === 'head' ? 'selected' : ''}>Сармураббӣ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ҳуҷра</label>
+            <select id="editSupRoom" class="form-control">
+              ${supervisorRooms.map(r => `<option value="${r.id}" ${sup.room === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ҷой (1-4)</label>
+            <input type="number" id="editSupBed" min="1" max="4" value="${sup.bed || 1}" class="form-control">
+          </div>
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('editSupForm').requestSubmit()">Сабт кардан</button>
+    `;
+
+    openModal("Таҳрири маълумоти мураббӣ", body, footer);
+  },
+
+  saveSupervisorEdits(e, id) {
+    e.preventDefault();
+    const name = document.getElementById("editSupName")?.value.trim();
+    const phone = document.getElementById("editSupPhone")?.value.trim();
+    const email = document.getElementById("editSupEmail")?.value.trim();
+    const role = document.getElementById("editSupRole")?.value;
+    const room = document.getElementById("editSupRoom")?.value;
+    const bed = Number(document.getElementById("editSupBed")?.value);
+
+    store.updateSupervisor(id, { name, phone, email, role, room, bed });
+    closeModal();
+    showToast("Маълумоти мураббӣ нав карда шуд!", "success");
+  },
+
+  deleteSupervisor(id) {
+    if (!store.canManageStudents()) return;
+    const sup = store.state.supervisors.find(s => s.id === id);
+    if (!sup) return;
+
+    if (confirm(`Оё мутмаин ҳастед, ки ${sup.name}-ро хориҷ кардан мехоҳед?`)) {
+      try {
+        store.deleteSupervisor(id);
+        showToast(`${sup.name} хориҷ карда шуд!`, "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+  },
+
   // Supervisor quarters assignment
   openAssignSupervisorModal() {
     if (!store.canManageStudents()) return;
