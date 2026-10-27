@@ -1319,8 +1319,22 @@ store.subscribe(() => {
   renderApp();
 });
 
-// Initial boot
-document.addEventListener("DOMContentLoaded", () => {
-  syncManager.init(store);
-  renderApp();
-});
+// Immediate Fail-Safe Boot (Never blocked by DOMContentLoaded or network)
+function bootApp() {
+  try {
+    renderApp();
+  } catch (err) {
+    console.error("Initial renderApp error:", err);
+  }
+
+  // Connect background cloud sync asynchronously
+  setTimeout(() => {
+    syncManager.init(store);
+  }, 100);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootApp);
+} else {
+  bootApp();
+}
