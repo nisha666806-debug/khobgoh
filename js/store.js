@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v2_2";
+const STORAGE_KEY = "khobgoh_state_v3_0";
 
 class Store {
   constructor() {
@@ -13,17 +13,23 @@ class Store {
 
   loadState() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          ...initialData,
-          ...parsed,
-          activeRole: parsed.activeRole || "manager",
-          lang: parsed.lang || "tg",
-          theme: parsed.theme || "light",
-          currentPage: parsed.currentPage === "chat" ? "dashboard" : (parsed.currentPage || "dashboard")
-        };
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            ...initialData,
+            ...parsed,
+            tea: {
+              recipes: parsed.tea?.recipes && parsed.tea.recipes.length ? parsed.tea.recipes : initialData.tea.recipes,
+              classSchedule: parsed.tea?.classSchedule && parsed.tea.classSchedule.length ? parsed.tea.classSchedule : initialData.tea.classSchedule
+            },
+            activeRole: parsed.activeRole || "manager",
+            lang: parsed.lang || "tg",
+            theme: parsed.theme || "light",
+            currentPage: parsed.currentPage === "chat" ? "dashboard" : (parsed.currentPage || "dashboard")
+          };
+        }
       }
     } catch (e) {
       console.warn("Failed to load local storage state, using seed defaults:", e);
@@ -40,7 +46,9 @@ class Store {
 
   saveState() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      }
     } catch (e) {
       console.error("Storage save failed:", e);
     }
@@ -69,6 +77,22 @@ class Store {
     return this.state.activeRole === "manager" || this.state.activeRole === "head";
   }
 
+  canManageRooms() {
+    return this.state.activeRole === "manager" || this.state.activeRole === "head";
+  }
+
+  canManageSupervisors() {
+    return this.state.activeRole === "manager" || this.state.activeRole === "head";
+  }
+
+  canManageTea() {
+    return this.state.activeRole === "manager" || this.state.activeRole === "head";
+  }
+
+  isHeadSupervisor() {
+    return this.state.activeRole === "head";
+  }
+
   canManageActivities() {
     return this.state.activeRole === "manager" || this.state.activeRole === "head";
   }
@@ -76,8 +100,7 @@ class Store {
   canRateCleanliness() {
     if (this.state.activeRole === "manager" || this.state.activeRole === "head") return true;
     if (this.state.activeRole === "supervisor") {
-      // Check if current user is the designated inspector
-      return true; // We allow testing in demo, or limit to designated inspector
+      return true;
     }
     return false;
   }
@@ -184,23 +207,83 @@ class Store {
   }
 
   // Add or configure custom room
-  addCustomRoom(id, capacity = 8, floor = 1, type = "student") {
+  addCustomRoom(id, capacity = 8, floor = 1, type = "student", supervisorId = "") {
     const roomId = String(id).trim();
     const existing = this.state.rooms.find(r => r.id === roomId);
     if (existing) {
       existing.capacity = Number(capacity);
       existing.floor = Number(floor);
       existing.type = type;
+      if (supervisorId) existing.supervisorId = supervisorId;
     } else {
       this.state.rooms.push({
         id: roomId,
         name: type === "supervisor" ? `Мураббиён ${roomId}` : `Ҳуҷраи ${roomId}`,
         floor: Number(floor) || (parseInt(roomId[0]) || 1),
         type,
-        capacity: Number(capacity)
+        capacity: Number(capacity),
+        supervisorId: supervisorId || ""
       });
     }
     this.saveState();
+  }
+
+  // Update Room (name, number, capacity, floor, type, supervisorId)
+  updateRoom(oldId, updates) {
+    if (!this.canManageRooms()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд ҳуҷраро таҳрир кунанд.");
+    }
+    const target = this.state.rooms.find(r => r.id === oldId);
+    if (!target) return;
+
+    const newId = updates.id ? String(updates.id).trim() : oldId;
+    if (newId !== oldId) {
+      this.state.students.forEach(s => {
+        if (s.room === oldId) s.room = newId;
+      });
+      if (this.state.roomLeaders[oldId]) {
+        this.state.roomLeaders[newId] = this.state.roomLeaders[oldId];
+        delete this.state.roomLeaders[oldId];
+      }
+      target.id = newId;
+    }
+
+    if (updates.name) target.name = updates.name;
+    if (updates.capacity) target.capacity = Number(updates.capacity);
+    if (updates.floor) target.floor = Number(updates.floor);
+    if (updates.type) target.type = updates.type;
+    if (updates.supervisorId !== undefined) target.supervisorId = updates.supervisorId;
+
+    this.saveState();
+  }
+
+  deleteRoom(roomId) {
+    if (!this.canManageRooms()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд ҳуҷраро хориҷ кунанд.");
+    }
+    this.state.rooms = this.state.rooms.filter(r => r.id !== roomId);
+    delete this.state.roomLeaders[roomId];
+    this.saveState();
+  }
+
+  setRoomSupervisor(roomId, supervisorId) {
+    if (!this.canManageRooms()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд масъули ҳуҷраро таъин кунанд.");
+    }
+    const room = this.state.rooms.find(r => r.id === roomId);
+    if (room) {
+      room.supervisorId = supervisorId;
+      this.saveState();
+    }
+  }
+
+  setSupervisorRoomLeader(roomId, supervisorId) {
+    if (!this.canManageRooms()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд сардори ҳуҷраи мураббиёнро таъин кунанд.");
+    }
+    this.state.roomLeaders[roomId] = supervisorId;
+    this.saveState();
+    syncManager.syncMeta({ roomLeaders: this.state.roomLeaders });
   }
 
   // --- Supervisors CRUD ---
@@ -271,10 +354,77 @@ class Store {
     syncManager.syncMeta({ cleanlinessInspectorId: supervisorId });
   }
 
-  // Update Tea duty from any page
-  updateTeaDuty(todayDuty, samovarStatus) {
-    if (todayDuty) this.state.tea.todayDuty = todayDuty;
-    if (samovarStatus) this.state.tea.samovarStatus = samovarStatus;
+  // --- Tea Recipes CRUD (Managed by Head Supervisor) ---
+  addTeaRecipe(item) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд ресептҳои чойро илова кунанд.");
+    }
+    const newRec = {
+      id: "rec_" + Date.now(),
+      name: item.name,
+      ingredients: item.ingredients || "",
+      time: item.time || "10 дақиқа дам хӯрдан",
+      author: "Сармураббӣ"
+    };
+    if (!this.state.tea.recipes) this.state.tea.recipes = [];
+    this.state.tea.recipes.push(newRec);
+    this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
+    return newRec;
+  }
+
+  updateTeaRecipe(id, updates) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд ресептро таҳрир кунанд.");
+    }
+    this.state.tea.recipes = (this.state.tea.recipes || []).map(r => r.id === id ? { ...r, ...updates } : r);
+    this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
+  }
+
+  deleteTeaRecipe(id) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ ё Мудир метавонанд ресептро хориҷ кунанд.");
+    }
+    this.state.tea.recipes = (this.state.tea.recipes || []).filter(r => r.id !== id);
+    this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
+  }
+
+  // --- Class Tea Schedule CRUD ---
+  addClassTeaSchedule(item) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ метавонад ҷадвали чойнӯшии синфҳоро таъин кунад.");
+    }
+    const newSched = {
+      id: "ts_" + Date.now(),
+      class: item.class || "Синфи 7",
+      meal: item.meal || "Субҳона",
+      time: item.time || "07:00 - 07:30",
+      place: item.place || "Ошхона",
+      notes: item.notes || ""
+    };
+    if (!this.state.tea.classSchedule) this.state.tea.classSchedule = [];
+    this.state.tea.classSchedule.push(newSched);
+    this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
+    return newSched;
+  }
+
+  updateClassTeaSchedule(id, updates) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ метавонад ин соати чойнӯширо таҳрир кунад.");
+    }
+    this.state.tea.classSchedule = (this.state.tea.classSchedule || []).map(s => s.id === id ? { ...s, ...updates } : s);
+    this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
+  }
+
+  deleteClassTeaSchedule(id) {
+    if (!this.canManageTea()) {
+      throw new Error("Танҳо Сармураббӣ метавонад ин соатро хориҷ кунад.");
+    }
+    this.state.tea.classSchedule = (this.state.tea.classSchedule || []).filter(s => s.id !== id);
     this.saveState();
     syncManager.syncMeta({ tea: this.state.tea });
   }

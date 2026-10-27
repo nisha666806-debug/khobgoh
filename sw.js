@@ -1,5 +1,5 @@
-// Khobgoh Modern Service Worker v2.7 (Network-first for scripts & updates)
-const CACHE_NAME = "khobgoh-pwa-v2.7";
+// Khobgoh Modern Service Worker v3.0 (Network-first for scripts & updates)
+const CACHE_NAME = "khobgoh-pwa-v3.0";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,6 +19,7 @@ const ASSETS = [
   "./js/views/violations.js",
   "./js/views/cleanliness.js",
   "./js/views/roster.js",
+  "./js/views/supervisors.js",
   "./js/views/tea.js",
   "./js/views/settings.js",
   "./assets/dormitory-logo.png",

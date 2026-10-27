@@ -17,6 +17,7 @@ export const translations = {
     nav_violations: "Қоидавайронкунӣ",
     nav_cleanliness: "Озмуни тозагӣ",
     nav_roster: "Навбатдорӣ",
+    nav_supervisors: "Мураббиён",
     nav_tea: "Чойнӯшӣ",
     nav_settings: "Танзимот",
 
@@ -163,6 +164,7 @@ export const translations = {
     nav_violations: "Violations",
     nav_cleanliness: "Cleanliness Cup",
     nav_roster: "Duty Roster",
+    nav_supervisors: "Supervisors",
     nav_tea: "Kitchen & Tea",
     nav_settings: "Settings",
 

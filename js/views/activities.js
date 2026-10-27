@@ -17,7 +17,7 @@ export function renderActivities() {
     { key: "sun", label: "Якшанбе" }
   ];
 
-  const classes = ["Синфи 8", "Синфи 9", "Синфи 10", "Синфи 11"];
+  const classes = ["Синфи 7", "Синфи 8", "Синфи 9", "Синфи 10", "Синфи 11"];
 
   // Filter activities
   const filtered = store.state.activities.filter(a => {

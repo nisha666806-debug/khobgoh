@@ -9,6 +9,7 @@ import { renderActivities } from "./views/activities.js";
 import { renderViolations } from "./views/violations.js";
 import { renderCleanliness } from "./views/cleanliness.js";
 import { renderRoster } from "./views/roster.js";
+import { renderSupervisors } from "./views/supervisors.js";
 import { renderTea } from "./views/tea.js";
 import { renderSettings } from "./views/settings.js";
 
@@ -142,6 +143,14 @@ function renderApp() {
             ${t('nav_roster')}
           </button>
 
+          ${(state.activeRole === 'manager' || state.activeRole === 'head') ? `
+            <button class="nav-link ${state.currentPage === 'supervisors' ? 'active' : ''}" onclick="window.khobgoh.navigate('supervisors')">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              ${t('nav_supervisors')}
+              <span class="badge" style="background:var(--indigo-100); color:var(--indigo-800);">${state.supervisors ? state.supervisors.length : 0}</span>
+            </button>
+          ` : ''}
+
           <button class="nav-link ${state.currentPage === 'tea' ? 'active' : ''}" onclick="window.khobgoh.navigate('tea')">
             <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
             ${t('nav_tea')}
@@ -182,13 +191,11 @@ function renderApp() {
           <div style="display:flex; align-items:center; gap:8px;">
             <button 
               class="btn btn-secondary btn-sm" 
-              onclick="window.khobgoh.openQuickTeaModal()" 
+              onclick="window.khobgoh.navigate('tea')" 
               style="display:flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.35); color:var(--emerald-800); font-weight:700;"
-              title="Маълумот ва идоракунии фаврии чойнӯшӣ">
+              title="Ҷадвали чойнӯшии синфҳо ва рецептҳо">
               <span>🍵</span>
-              <span style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                ${state.tea.todayDuty.split('(')[0]}
-              </span>
+              <span>Чойнӯшӣ</span>
             </button>
 
             <!-- Real-time Cloud Sync & Auth Button -->
@@ -277,6 +284,7 @@ function renderCurrentPageView(page) {
     case "violations": return renderViolations();
     case "cleanliness": return renderCleanliness();
     case "roster": return renderRoster();
+    case "supervisors": return renderSupervisors();
     case "tea": return renderTea();
     case "settings": return renderSettings();
     default: return renderDashboard();
@@ -409,6 +417,7 @@ window.khobgoh = {
         <div class="form-group">
           <label class="form-label">Синф / Гурӯҳ</label>
           <select id="actClass" class="form-control">
+            <option value="Синфи 7">Синфи 7</option>
             <option value="Синфи 8">Синфи 8</option>
             <option value="Синфи 9">Синфи 9</option>
             <option value="Синфи 10">Синфи 10</option>
@@ -656,8 +665,8 @@ window.khobgoh = {
     openModal("Таҳрири маълумоти мураббӣ", body, footer);
   },
 
-  saveSupervisorEdits(e, id) {
-    e.preventDefault();
+  saveSupervisorEdits(arg1, arg2) {
+    const id = typeof arg1 === 'string' ? arg1 : arg2;
     const name = document.getElementById("editSupName")?.value.trim();
     const phone = document.getElementById("editSupPhone")?.value.trim();
     const email = document.getElementById("editSupEmail")?.value.trim();
@@ -671,7 +680,10 @@ window.khobgoh = {
   },
 
   deleteSupervisor(id) {
-    if (!store.canManageStudents()) return;
+    if (!store.canManageSupervisors()) {
+      showToast("Дастрасӣ танҳо барои Мудир ва Сармураббӣ!", "error");
+      return;
+    }
     const sup = store.state.supervisors.find(s => s.id === id);
     if (!sup) return;
 
@@ -685,9 +697,122 @@ window.khobgoh = {
     }
   },
 
+  toggleSupervisorRole(id) {
+    if (!store.canManageSupervisors()) {
+      showToast("Дастрасӣ танҳо барои Мудир ва Сармураббӣ!", "error");
+      return;
+    }
+    const sup = store.state.supervisors.find(s => s.id === id);
+    if (!sup) return;
+    const nextRole = sup.role === 'head' ? 'supervisor' : 'head';
+    store.updateSupervisor(id, { role: nextRole });
+    showToast(`Вазифаи ${sup.name} ба «${nextRole === 'head' ? 'Сармураббӣ' : 'Мураббӣ'}» иваз шуд!`, "success");
+  },
+
+  copyText(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      showToast("Нусхабардорӣ шуд!", "success");
+    } else {
+      const input = document.createElement("input");
+      input.value = text;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+      showToast("Нусхабардорӣ шуд!", "success");
+    }
+  },
+
+  openCreateInviteModal() {
+    if (!store.canManageSupervisors()) {
+      showToast("Дастрасӣ танҳо барои Мудир ва Сармураббӣ!", "error");
+      return;
+    }
+    const studentRooms = store.state.rooms.filter(r => r.type === 'student');
+
+    const body = `
+      <form id="createInviteForm" onsubmit="window.khobgoh.submitCreateInvite(event)">
+        <div class="form-group">
+          <label class="form-label">Ному насаби мураббӣ *</label>
+          <input type="text" id="invSupName" class="form-control" required placeholder="Масалан: Алиев Беҳрӯз">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Email мураббӣ *</label>
+            <input type="email" id="invSupEmail" class="form-control" required placeholder="behruz@khobgoh.tj">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Телефон *</label>
+            <input type="text" id="invSupPhone" class="form-control" required placeholder="+992 900 12 34 56">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ҳуҷраҳои вобасташуда (Интихоб кунед)</label>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:8px; max-height:140px; overflow-y:auto; padding:8px; background:var(--surface-muted); border-radius:6px;">
+            ${studentRooms.map(r => `
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+                <input type="checkbox" name="invRoom" value="${r.id}">
+                <span>Ҳуҷраи ${r.id}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitCreateInvite()">Сохтани код</button>
+    `;
+
+    openModal("Эҷоди коди даъват барои Мураббӣ", body, footer);
+  },
+
+  async submitCreateInvite(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const name = document.getElementById("invSupName")?.value.trim();
+    const email = document.getElementById("invSupEmail")?.value.trim();
+    const phone = document.getElementById("invSupPhone")?.value.trim();
+    const checkedBoxes = Array.from(document.querySelectorAll('input[name="invRoom"]:checked')).map(cb => cb.value);
+
+    if (!name || !email || !phone) {
+      showToast("Лутфан ном, email ва телефонро пур кунед.", "error");
+      return;
+    }
+
+    try {
+      const code = await syncManager.createInvitation({ name, email, phone, roomIds: checkedBoxes });
+      closeModal();
+      openModal("Коди даъват омода аст ✅", `
+        <div style="text-align:center; padding:12px 0;">
+          <div style="font-size:42px; margin-bottom:8px;">📨</div>
+          <h3 style="margin:0 0 6px 0; font-size:17px; font-weight:800; color:var(--emerald-800);">Коди даъвати нав сохта шуд</h3>
+          <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px 0;">
+            Ин кодро ба мураббӣ <b>${name}</b> (${email}) расонед:
+          </p>
+          <div style="font-size:24px; font-weight:900; letter-spacing:2px; background:var(--surface-muted); padding:12px 18px; border-radius:10px; margin:0 auto 16px auto; border:2px dashed var(--emerald-600); color:var(--emerald-800); display:inline-block; user-select:all;">
+            ${code}
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.copyText('${code}')">
+              📋 Нусхабардории код
+            </button>
+          </div>
+        </div>
+      `, `<button class="btn btn-primary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>`);
+    } catch (err) {
+      console.error(err);
+      showToast("Хатогӣ дар сохтани даъватнома: " + (err.message || ''), "error");
+    }
+  },
+
   // Supervisor quarters assignment
-  openAssignSupervisorModal() {
-    if (!store.canManageStudents()) return;
+  openAssignSupervisorModal(defaultRoomId, defaultBedNum) {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
     const supervisors = store.state.supervisors;
     const supervisorRooms = store.state.rooms.filter(r => r.type === 'supervisor');
 
@@ -695,7 +820,7 @@ window.khobgoh = {
       <div class="form-group">
         <label class="form-label">Мураббӣ</label>
         <select id="assignSupSelect" class="form-control">
-          ${supervisors.map(s => `<option value="${s.id}">${s.name} (${s.phone})</option>`).join('')}
+          ${supervisors.map(s => `<option value="${s.id}">${s.name} (${s.phone || ''})</option>`).join('')}
         </select>
       </div>
 
@@ -703,12 +828,24 @@ window.khobgoh = {
         <div class="form-group">
           <label class="form-label">Ҳуҷра</label>
           <select id="assignSupRoom" class="form-control">
-            ${supervisorRooms.map(r => `<option value="${r.id}">${r.name} (4 ҷойӣ)</option>`).join('')}
+            ${supervisorRooms.map(r => `<option value="${r.id}" ${defaultRoomId === r.id ? 'selected' : ''}>${r.name || 'Мураббиён ' + r.id} (${r.capacity || 4} ҷойӣ)</option>`).join('')}
           </select>
         </div>
 
         <div class="form-group">
           <label class="form-label">Ҷой (1-4)</label>
+          <input type="number" id="assignSupBed" min="1" max="10" value="${defaultBedNum || 1}" class="form-control">
+        </div>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitAssignSupervisor()">Таъин кардан</button>
+    `;
+
+    openModal("Таъин кардани мураббӣ ба ҳуҷра", body, footer);
+  },
           <input type="number" id="assignSupBed" min="1" max="4" value="1" class="form-control">
         </div>
       </div>
@@ -777,6 +914,7 @@ window.khobgoh = {
   // Students filtering
   filterStudents() {
     const search = document.getElementById("studentSearchInput")?.value.toLowerCase().trim() || "";
+    const filterClass = document.getElementById("studentClassFilter")?.value.toLowerCase().trim() || "";
     const room = document.getElementById("studentRoomFilter")?.value || "";
     const status = document.getElementById("studentStatusFilter")?.value || "";
 
@@ -785,13 +923,15 @@ window.khobgoh = {
       const name = row.getAttribute("data-name") || "";
       const sid = row.getAttribute("data-id") || "";
       const sroom = row.getAttribute("data-room") || "";
+      const scourse = row.getAttribute("data-course") || "";
       const sstatus = row.getAttribute("data-status") || "";
 
-      const matchesSearch = !search || name.includes(search) || sid.includes(search);
+      const matchesSearch = !search || name.includes(search) || sid.includes(search) || scourse.includes(search);
+      const matchesClass = !filterClass || scourse.includes(filterClass);
       const matchesRoom = !room || sroom === room;
       const matchesStatus = !status || sstatus === status;
 
-      row.style.display = matchesSearch && matchesRoom && matchesStatus ? "" : "none";
+      row.style.display = matchesSearch && matchesClass && matchesRoom && matchesStatus ? "" : "none";
     });
   },
 
@@ -847,10 +987,451 @@ window.khobgoh = {
     showToast(`Ҳуҷраи ${id} бомуваффақият сабт шуд!`, "success");
   },
 
+  openAddSupervisorRoomModal() {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
+    const body = `
+      <form id="addSupRoomForm" onsubmit="window.khobgoh.submitAddSupervisorRoom(event)">
+        <div class="form-group">
+          <label class="form-label">Рақами ҳуҷраи мураббиён (масалан: 201, 202, 203, 204) *</label>
+          <input type="text" id="supRoomId" class="form-control" required placeholder="Рақами ҳуҷра...">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Иқтидор (Катҳои хоб) *</label>
+            <input type="number" id="supRoomCap" min="1" max="10" value="4" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ошёна</label>
+            <input type="number" id="supRoomFloor" min="1" max="5" value="2" class="form-control">
+          </div>
+        </div>
+      </form>
+    `;
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitAddSupervisorRoom()">Сабт кардан</button>
+    `;
+    openModal("Иловаи ҳуҷраи нави мураббиён", body, footer);
+  },
+
+  submitAddSupervisorRoom(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = document.getElementById("supRoomId")?.value.trim();
+    const cap = Number(document.getElementById("supRoomCap")?.value) || 4;
+    const floor = Number(document.getElementById("supRoomFloor")?.value) || 2;
+    if (!id) return;
+    store.addCustomRoom(id, cap, floor, "supervisor");
+    closeModal();
+    showToast(`Ҳуҷраи мураббиён №${id} илова шуд!`, "success");
+  },
+
+  openEditRoomModal(roomId) {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
+    const room = store.state.rooms.find(r => r.id === roomId);
+    if (!room) return;
+
+    const body = `
+      <form id="editRoomForm" onsubmit="window.khobgoh.saveRoomEdits('${roomId}', event)">
+        <div class="form-group">
+          <label class="form-label">Номи ҳуҷра *</label>
+          <input type="text" id="editRoomName" class="form-control" value="${room.name || (room.type === 'supervisor' ? 'Мураббиён ' + room.id : 'Ҳуҷраи ' + room.id)}" required>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Иқтидор (Ҷой / Кат) *</label>
+            <input type="number" id="editRoomCap" class="form-control" value="${room.capacity}" min="1" max="24" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ошёна *</label>
+            <input type="number" id="editRoomFloor" class="form-control" value="${room.floor || 1}" min="1" max="5" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Навъи ҳуҷра</label>
+          <select id="editRoomType" class="form-control">
+            <option value="student" ${room.type === 'student' ? 'selected' : ''}>Ҳуҷраи талабагон</option>
+            <option value="supervisor" ${room.type === 'supervisor' ? 'selected' : ''}>Ҳуҷраи мураббиён</option>
+          </select>
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.saveRoomEdits('${roomId}')">Сабт кардан</button>
+    `;
+
+    openModal(`Таҳрири Ҳуҷраи ${roomId}`, body, footer);
+  },
+
+  saveRoomEdits(roomId, e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const name = document.getElementById("editRoomName")?.value.trim();
+    const capacity = Number(document.getElementById("editRoomCap")?.value);
+    const floor = Number(document.getElementById("editRoomFloor")?.value);
+    const type = document.getElementById("editRoomType")?.value;
+
+    if (!capacity) return;
+
+    store.updateRoom(roomId, { name, capacity, floor, type });
+    closeModal();
+    showToast(`Ҳуҷраи ${roomId} бомуваффақият нав карда шуд!`, "success");
+  },
+
+  deleteRoom(roomId) {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
+    const room = store.state.rooms.find(r => r.id === roomId);
+    if (!room) return;
+
+    if (confirm(`Оё мутмаин ҳастед, ки Ҳуҷраи ${roomId}-ро хориҷ кардан мехоҳед? Ҳамаи таъиноти марбут ба ин ҳуҷра пок мешаванд.`)) {
+      try {
+        store.deleteRoom(roomId);
+        showToast(`Ҳуҷраи ${roomId} хориҷ карда шуд!`, "info");
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+  },
+
+  openAssignSupervisorToRoomModal(roomId) {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
+    const room = store.state.rooms.find(r => r.id === roomId);
+    if (!room) return;
+    const supervisors = store.state.supervisors || [];
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Мураббии масъулро барои Ҳуҷраи ${roomId} интихоб кунед:</label>
+        <select id="supInChargeSelect" class="form-control">
+          <option value="">-- Бе мураббии масъул --</option>
+          ${supervisors.map(s => `
+            <option value="${s.id}" ${room.supervisorId === s.id ? 'selected' : ''}>
+              ${s.name} (${s.role === 'head' ? '👑 Сармураббӣ' : 'Мураббӣ'}, ${s.phone || ''})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.saveRoomSupervisorAssignment('${roomId}')">Таъин кардан</button>
+    `;
+
+    openModal(`Таъини мураббии масъули Ҳуҷраи ${roomId}`, body, footer);
+  },
+
+  saveRoomSupervisorAssignment(roomId) {
+    const supervisorId = document.getElementById("supInChargeSelect")?.value || null;
+    store.setRoomSupervisor(roomId, supervisorId);
+    closeModal();
+    const sup = store.state.supervisors.find(s => s.id === supervisorId);
+    showToast(sup ? `${sup.name} мураббии масъули Ҳуҷраи ${roomId} таъин шуд!` : `Мураббии масъул барои Ҳуҷраи ${roomId} бекор шуд.`, "success");
+  },
+
+  openSetSupervisorRoomLeaderModal(roomId) {
+    if (!store.canManageRooms()) {
+      showToast("Дастрасӣ танҳо барои Сармураббӣ ва Мудир!", "error");
+      return;
+    }
+    const supervisors = (store.state.supervisors || []).filter(s => s.room === roomId);
+    const currentLeaderId = store.state.roomLeaders ? store.state.roomLeaders[roomId] : null;
+
+    const body = `
+      <div class="form-group">
+        <label class="form-label">Интихоби Сардори Ҳуҷраи Мураббиён (${roomId}):</label>
+        ${supervisors.length === 0 ? `
+          <p style="color:var(--text-muted); font-size:13px; padding:12px 0;">Дар ин ҳуҷра ҳоло ягон мураббӣ сабт нашудааст. Аввал мураббиро ба ин ҳуҷра вобаста кунед.</p>
+        ` : `
+          <select id="supRoomLeaderSelect" class="form-control">
+            <option value="">-- Бе сардори ҳуҷра --</option>
+            ${supervisors.map(s => `
+              <option value="${s.id}" ${currentLeaderId === s.id ? 'selected' : ''}>
+                ${s.name} (${s.role === 'head' ? '👑 Сармураббӣ' : 'Мураббӣ'}, Ҷойи №${s.bed || 1})
+              </option>
+            `).join('')}
+          </select>
+        `}
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      ${supervisors.length > 0 ? `
+        <button class="btn btn-primary" onclick="window.khobgoh.saveSupervisorRoomLeader('${roomId}')">Таъин кардан</button>
+      ` : ''}
+    `;
+
+    openModal(`Сардори ҳуҷраи мураббиён (${roomId})`, body, footer);
+  },
+
+  saveSupervisorRoomLeader(roomId) {
+    const supervisorId = document.getElementById("supRoomLeaderSelect")?.value || null;
+    store.setSupervisorRoomLeader(roomId, supervisorId);
+    closeModal();
+    const sup = store.state.supervisors.find(s => s.id === supervisorId);
+    showToast(sup ? `${sup.name} сардори Ҳуҷраи ${roomId} таъин шуд!` : "Сардори ҳуҷра бекор карда шуд.", "success");
+  },
+
+  // Tea & Kitchen Actions
+  selectedTeaClass: "",
+
+  changeTeaClassFilter(cls) {
+    window.khobgoh.selectedTeaClass = cls;
+    renderApp();
+  },
+
+  openAddTeaRecipeModal() {
+    if (!store.canManageTea()) {
+      showToast("Танҳо Сармураббӣ ё Мудир метавонанд ресептро илова кунанд!", "error");
+      return;
+    }
+    const body = `
+      <form id="teaRecipeForm" onsubmit="window.khobgoh.submitNewTeaRecipe(event)">
+        <div class="form-group">
+          <label class="form-label">Номи чой *</label>
+          <input type="text" id="recipeName" class="form-control" required placeholder="Масалан: Чойи кабуд бо лиму ва наъно">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Таркиб ва компонентҳо *</label>
+          <textarea id="recipeIngredients" class="form-control" rows="3" required placeholder="Чойи кабуди рақами 95, наъно, лиму, шакар ё набот..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Вақти дамхӯрӣ *</label>
+          <input type="text" id="recipeTime" class="form-control" value="10 дақиқа" required placeholder="Масалан: 10 дақиқа, 15 дақиқа">
+        </div>
+      </form>
+    `;
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitNewTeaRecipe()">Сабт кардан</button>
+    `;
+    openModal("Иловаи ресепти нави чой (Сармураббӣ)", body, footer);
+  },
+
+  submitNewTeaRecipe(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const name = document.getElementById("recipeName")?.value.trim();
+    const ingredients = document.getElementById("recipeIngredients")?.value.trim();
+    const time = document.getElementById("recipeTime")?.value.trim();
+    if (!name || !ingredients) return;
+    store.addTeaRecipe({ name, ingredients, time });
+    closeModal();
+    showToast(`Ресепти «${name}» бомуваффақият сабт шуд!`, "success");
+  },
+
+  openEditTeaRecipeModal(id) {
+    if (!store.canManageTea()) return;
+    const r = (store.state.tea?.recipes || []).find(x => x.id === id);
+    if (!r) return;
+
+    const body = `
+      <form id="editTeaRecipeForm" onsubmit="window.khobgoh.saveTeaRecipeEdits('${id}', event)">
+        <div class="form-group">
+          <label class="form-label">Номи чой *</label>
+          <input type="text" id="editRecipeName" class="form-control" value="${r.name}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Таркиб ва компонентҳо *</label>
+          <textarea id="editRecipeIngredients" class="form-control" rows="3" required>${r.ingredients || ''}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Вақти дамхӯрӣ *</label>
+          <input type="text" id="editRecipeTime" class="form-control" value="${r.time || '10 дақиқа'}" required>
+        </div>
+      </form>
+    `;
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.saveTeaRecipeEdits('${id}')">Сабт кардан</button>
+    `;
+    openModal("Таҳрири ресепти чой", body, footer);
+  },
+
+  saveTeaRecipeEdits(id, e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const name = document.getElementById("editRecipeName")?.value.trim();
+    const ingredients = document.getElementById("editRecipeIngredients")?.value.trim();
+    const time = document.getElementById("editRecipeTime")?.value.trim();
+    if (!name || !ingredients) return;
+
+    store.updateTeaRecipe(id, { name, ingredients, time });
+    closeModal();
+    showToast("Ресепт нав карда шуд!", "success");
+  },
+
+  deleteTeaRecipe(id) {
+    if (!store.canManageTea()) return;
+    const r = (store.state.tea?.recipes || []).find(x => x.id === id);
+    if (!r) return;
+    if (confirm(`Оё мехоҳед ресепти «${r.name}»-ро хориҷ кунед?`)) {
+      store.deleteTeaRecipe(id);
+      showToast(`Ресепт хориҷ карда шуд!`, "info");
+    }
+  },
+
+  openAddClassTeaModal() {
+    if (!store.canManageTea()) {
+      showToast("Танҳо Сармураббӣ ё Мудир метавонанд соати чойнӯширо таъин кунанд!", "error");
+      return;
+    }
+    const classes = ["Синфи 7", "Синфи 8", "Синфи 9", "Синфи 10", "Синфи 11"];
+
+    const body = `
+      <form id="addClassTeaForm" onsubmit="window.khobgoh.submitNewClassTea(event)">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Синф *</label>
+            <select id="classTeaClass" class="form-control" required>
+              ${classes.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Вақти хӯрок / Навбат *</label>
+            <select id="classTeaMeal" class="form-control" required>
+              <option value="Субҳона">Субҳона</option>
+              <option value="Нисфирӯзӣ">Нисфирӯзӣ</option>
+              <option value="Шомгоҳӣ">Шомгоҳӣ</option>
+              <option value="Шабона">Шабона (Чойнӯшии шабона)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Соати чойнӯшӣ *</label>
+            <input type="text" id="classTeaTime" class="form-control" required placeholder="07:30 - 08:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Макон *</label>
+            <input type="text" id="classTeaPlace" class="form-control" value="Ошхонаи асосӣ" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Маълумот / Номгӯй / Эзоҳ</label>
+          <input type="text" id="classTeaNotes" class="form-control" placeholder="Масалан: Чойи кабуд, ширчой, кулчақанд">
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitNewClassTea()">Сабт кардан</button>
+    `;
+
+    openModal("Иловаи соати чойнӯшӣ барои синф", body, footer);
+  },
+
+  submitNewClassTea(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const cls = document.getElementById("classTeaClass")?.value;
+    const meal = document.getElementById("classTeaMeal")?.value;
+    const time = document.getElementById("classTeaTime")?.value.trim();
+    const place = document.getElementById("classTeaPlace")?.value.trim();
+    const notes = document.getElementById("classTeaNotes")?.value.trim();
+
+    if (!cls || !time) return;
+
+    store.addClassTeaSchedule({ class: cls, meal, time, place, notes });
+    closeModal();
+    showToast(`Вақти чойнӯшии ${cls} бомуваффақият сабт шуд!`, "success");
+  },
+
+  openEditClassTeaModal(id) {
+    if (!store.canManageTea()) return;
+    const item = (store.state.tea?.classSchedule || []).find(x => x.id === id);
+    if (!item) return;
+    const classes = ["Синфи 7", "Синфи 8", "Синфи 9", "Синфи 10", "Синфи 11"];
+
+    const body = `
+      <form id="editClassTeaForm" onsubmit="window.khobgoh.saveClassTeaEdits('${id}', event)">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Синф *</label>
+            <select id="editClassTeaClass" class="form-control" required>
+              ${classes.map(c => `<option value="${c}" ${item.class === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Вақти хӯрок / Навбат *</label>
+            <select id="editClassTeaMeal" class="form-control" required>
+              <option value="Субҳона" ${item.meal === 'Субҳона' ? 'selected' : ''}>Субҳона</option>
+              <option value="Нисфирӯзӣ" ${item.meal === 'Нисфирӯзӣ' ? 'selected' : ''}>Нисфирӯзӣ</option>
+              <option value="Шомгоҳӣ" ${item.meal === 'Шомгоҳӣ' ? 'selected' : ''}>Шомгоҳӣ</option>
+              <option value="Шабона" ${item.meal === 'Шабона' ? 'selected' : ''}>Шабона (Чойнӯшии шабона)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Соати чойнӯшӣ *</label>
+            <input type="text" id="editClassTeaTime" class="form-control" value="${item.time}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Макон *</label>
+            <input type="text" id="editClassTeaPlace" class="form-control" value="${item.place || 'Ошхона'}" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Маълумот / Номгӯй / Эзоҳ</label>
+          <input type="text" id="editClassTeaNotes" class="form-control" value="${item.notes || ''}">
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.saveClassTeaEdits('${id}')">Сабт кардан</button>
+    `;
+
+    openModal(`Таҳрири соати чойнӯшӣ (${item.class})`, body, footer);
+  },
+
+  saveClassTeaEdits(id, e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const cls = document.getElementById("editClassTeaClass")?.value;
+    const meal = document.getElementById("editClassTeaMeal")?.value;
+    const time = document.getElementById("editClassTeaTime")?.value.trim();
+    const place = document.getElementById("editClassTeaPlace")?.value.trim();
+    const notes = document.getElementById("editClassTeaNotes")?.value.trim();
+
+    if (!cls || !time) return;
+
+    store.updateClassTeaSchedule(id, { class: cls, meal, time, place, notes });
+    closeModal();
+    showToast("Ҷадвали чойнӯшӣ нав карда шуд!", "success");
+  },
+
+  deleteClassTeaSchedule(id) {
+    if (!store.canManageTea()) return;
+    const item = (store.state.tea?.classSchedule || []).find(x => x.id === id);
+    if (!item) return;
+
+    if (confirm(`Оё мехоҳед вақти чойнӯшии ${item.class} (${item.meal} - ${item.time})-ро хориҷ кунед?`)) {
+      store.deleteClassTeaSchedule(id);
+      showToast("Вақти чойнӯшӣ хориҷ карда шуд!", "info");
+    }
+  },
+
   // Modals for Students
   openAddStudentModal() {
     if (!store.canManageStudents()) {
-      showToast("Танҳо Мудир ё Сармураббӣ метавонанд донишҷӯёнро дохил кунанд.", "error");
+      showToast("Танҳо Мудир ё Сармураббӣ метавонанд талабагонро дохил кунанд.", "error");
       return;
     }
 
@@ -882,7 +1463,7 @@ window.khobgoh = {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
             <label class="form-label">${t('students_col_course')}</label>
-            <input type="text" id="newStdCourse" class="form-control" placeholder="Синфи 10-А">
+            <input type="text" id="newStdCourse" class="form-control" placeholder="Синфи 7-А, 8, 9, 10, 11">
           </div>
 
           <div class="form-group">
@@ -919,7 +1500,7 @@ window.khobgoh = {
 
     store.addStudent({ name, room, bed, course, phone, guardian });
     closeModal();
-    showToast(`Донишҷӯ ${name} бо муваффақият сабт шуд!`, "success");
+    showToast(`Талаба ${name} бо муваффақият сабт шуд!`, "success");
   },
 
   openAssignBedModal(roomId, bedNum) {
@@ -930,7 +1511,7 @@ window.khobgoh = {
     const unassigned = store.state.students.filter(s => s.room !== roomId || Number(s.bed) !== bedNum);
     const body = `
       <div class="form-group">
-        <label class="form-label">Интихоби донишҷӯ барои Ҳуҷраи ${roomId}, Ҷойи №${bedNum}:</label>
+        <label class="form-label">Интихоби талаба барои Ҳуҷраи ${roomId}, Ҷойи №${bedNum}:</label>
         <select id="assignStudentSelect" class="form-control">
           ${unassigned.map(s => `<option value="${s.id}">${s.name} (${s.room ? 'Ҳуҷраи ' + s.room : 'Бе ҷой'})</option>`).join('')}
         </select>
@@ -951,7 +1532,7 @@ window.khobgoh = {
 
     store.updateStudent(studentId, { room: roomId, bed: bedNum, status: "Active" });
     closeModal();
-    showToast(`Ҷойи №${bedNum} ба донишҷӯ бо муваффақият таъин шуд!`, "success");
+    showToast(`Ҷойи №${bedNum} ба талаба бо муваффақият таъин шуд!`, "success");
   },
 
   deleteStudent(id) {
@@ -1075,7 +1656,7 @@ window.khobgoh = {
 
   markAllPresent(date) {
     store.markAllPresent(date);
-    showToast("Ҳамаи донишҷӯён «Ҳаст» сабт шуданд!", "success");
+    showToast("Ҳамаи талабагон «Ҳаст» сабт шуданд!", "success");
     renderApp();
   },
 
