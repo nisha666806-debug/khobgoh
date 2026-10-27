@@ -1,5 +1,5 @@
-// Khobgoh Modern Service Worker v2.3 (Updated with custom tree-home logo)
-const CACHE_NAME = "khobgoh-pwa-v2.3";
+// Khobgoh Modern Service Worker v2.4 (with Firebase real-time sync)
+const CACHE_NAME = "khobgoh-pwa-v2.4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,8 @@ const ASSETS = [
   "./js/store.js",
   "./js/data.js",
   "./js/translations.js",
+  "./js/sync.js",
+  "./js/firebase.js",
   "./js/views/dashboard.js",
   "./js/views/students.js",
   "./js/views/rooms.js",
@@ -43,6 +45,11 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
+  // If fetching Firebase/Google APIs, bypass service worker cache
+  if (e.request.url.includes("firestore.googleapis.com") || e.request.url.includes("identitytoolkit.googleapis.com")) {
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then((res) => {
       return res || fetch(e.request).catch(() => caches.match("./index.html"));

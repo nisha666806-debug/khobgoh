@@ -1,5 +1,6 @@
 // Khobgoh Main Application Controller v2.2
 import { store } from "./store.js";
+import { syncManager } from "./sync.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { renderStudents } from "./views/students.js";
 import { renderRooms } from "./views/rooms.js";
@@ -178,17 +179,39 @@ function renderApp() {
           </div>
 
           <!-- Quick Tea Access across ALL pages -->
-          <div style="display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
             <button 
               class="btn btn-secondary btn-sm" 
               onclick="window.khobgoh.openQuickTeaModal()" 
               style="display:flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.35); color:var(--emerald-800); font-weight:700;"
               title="Маълумот ва идоракунии фаврии чойнӯшӣ">
               <span>🍵</span>
-              <span style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <span style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 ${state.tea.todayDuty.split('(')[0]}
               </span>
             </button>
+
+            <!-- Real-time Cloud Sync & Auth Button -->
+            ${syncManager.currentUser ? `
+              <button 
+                class="btn btn-secondary btn-sm" 
+                onclick="window.khobgoh.openUserAccountModal()"
+                style="display:flex; align-items:center; gap:6px; background:#ecfdf5; border-color:#a7f3d0; color:#065f46; font-weight:700;"
+                title="Синхронизатсияи зинда бо дигар кормандон фаъол аст!">
+                <span style="font-size:12px;">☁️</span>
+                <span style="max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px;">
+                  ${syncManager.currentUser.email.split('@')[0]}
+                </span>
+              </button>
+            ` : `
+              <button 
+                class="btn btn-primary btn-sm" 
+                onclick="window.khobgoh.openLoginModal()" 
+                style="padding:6px 12px; font-size:12px;"
+                title="Воридшавӣ барои синхронизатсия">
+                🔑 Воридшавӣ
+              </button>
+            `}
 
             <!-- Language Quick Switcher -->
             <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.toggleLanguage()" title="Ивази забон (Language)">
@@ -1199,6 +1222,88 @@ window.khobgoh = {
     }
   },
 
+  // Auth & Cloud Sync Modals
+  openLoginModal() {
+    const body = `
+      <form id="loginForm" onsubmit="window.khobgoh.submitLogin(event)">
+        <div style="text-align:center; margin-bottom:16px;">
+          <img src="assets/dormitory-logo.png" style="width:54px; height:54px; border-radius:12px; margin-bottom:8px;">
+          <h3 style="margin:0; font-size:17px; font-weight:800;">Воридшавӣ ба система</h3>
+          <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Барои синхронизатсияи зинда бо телефонҳои дигар кормандон</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email корманд *</label>
+          <input type="email" id="loginEmail" class="form-control" required placeholder="nom@khobgoh.tj">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Парол *</label>
+          <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
+        </div>
+      </form>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="document.getElementById('loginForm').requestSubmit()">Ворид шудан</button>
+    `;
+
+    openModal("Воридшавӣ (Firebase Auth)", body, footer);
+  },
+
+  async submitLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail")?.value.trim();
+    const password = document.getElementById("loginPassword")?.value;
+
+    if (!email || !password) return;
+
+    try {
+      showToast("Дар ҳоли санҷиш ва пайвастшавӣ...", "info");
+      await syncManager.login(email, password);
+      closeModal();
+      showToast("Шумо бомуваффақият ворид шудед! Синхронизатсияи зинда фаъол шуд.", "success");
+    } catch (err) {
+      console.error("Login failed:", err);
+      showToast("Хатогӣ дар воридшавӣ: Email ё парол нодуруст аст.", "error");
+    }
+  },
+
+  openUserAccountModal() {
+    const user = syncManager.currentUser;
+    const body = `
+      <div style="text-align:center; padding:12px 0;">
+        <div style="font-size:36px; margin-bottom:6px;">☁️</div>
+        <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:800; color:var(--emerald-800);">Синхронизатсияи абрӣ фаъол аст</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px 0;">Ҳамаи амалҳои шумо дар як сония дар телефони дигар кормандон нав мешаванд.</p>
+
+        <div style="background:var(--surface-muted); padding:12px; border-radius:var(--radius-md); text-align:left; font-size:13px; margin-bottom:16px;">
+          <div><b>Email:</b> ${user?.email || '—'}</div>
+          <div style="margin-top:4px;"><b>Вазифа:</b> ${store.state.activeRole}</div>
+          <div style="margin-top:4px;"><b>Ҳолати шабака:</b> 🟢 Пайваст (Online)</div>
+        </div>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>
+      <button class="btn btn-danger" onclick="window.khobgoh.logoutUser()">Баромадан аз ҳисоб</button>
+    `;
+
+    openModal("Ҳисоби корманд ва ҳолати абр", body, footer);
+  },
+
+  async logoutUser() {
+    try {
+      await syncManager.logout();
+      closeModal();
+      showToast("Шумо аз ҳисоб баромадед. Реҷаи офлайн фаъол шуд.", "info");
+    } catch (e) {
+      console.error("Logout error:", e);
+    }
+  },
+
   closeModal
 };
 
@@ -1216,5 +1321,6 @@ store.subscribe(() => {
 
 // Initial boot
 document.addEventListener("DOMContentLoaded", () => {
+  syncManager.init(store);
   renderApp();
 });

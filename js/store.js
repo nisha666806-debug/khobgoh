@@ -1,6 +1,7 @@
 // Khobgoh Central State Store with LocalStorage persistence v2.2
 import { initialData } from "./data.js";
 import { translations } from "./translations.js";
+import { syncManager } from "./sync.js";
 
 const STORAGE_KEY = "khobgoh_state_v2_2";
 
@@ -162,12 +163,15 @@ class Store {
     };
     this.state.students.unshift(newStudent);
     this.saveState();
+    syncManager.syncStudent(newStudent);
     return newStudent;
   }
 
   updateStudent(id, updates) {
     this.state.students = this.state.students.map(s => s.id === id ? { ...s, ...updates } : s);
     this.saveState();
+    const updated = this.state.students.find(s => s.id === id);
+    if (updated) syncManager.syncStudent(updated);
   }
 
   deleteStudent(id) {
@@ -176,6 +180,7 @@ class Store {
     }
     this.state.students = this.state.students.filter(s => s.id !== id);
     this.saveState();
+    syncManager.syncStudent({ id }, true);
   }
 
   // Add or configure custom room
@@ -245,6 +250,7 @@ class Store {
     }
     this.state.roomLeaders[roomId] = studentId;
     this.saveState();
+    syncManager.syncMeta({ roomLeaders: this.state.roomLeaders });
   }
 
   // Assign Supervisor to Quarters (Rooms 201-203, Beds 1-4)
@@ -262,6 +268,7 @@ class Store {
   setCleanlinessInspector(supervisorId) {
     this.state.cleanlinessInspectorId = supervisorId;
     this.saveState();
+    syncManager.syncMeta({ cleanlinessInspectorId: supervisorId });
   }
 
   // Update Tea duty from any page
@@ -269,6 +276,7 @@ class Store {
     if (todayDuty) this.state.tea.todayDuty = todayDuty;
     if (samovarStatus) this.state.tea.samovarStatus = samovarStatus;
     this.saveState();
+    syncManager.syncMeta({ tea: this.state.tea });
   }
 
   // --- Activities CRUD ---
@@ -283,11 +291,13 @@ class Store {
     };
     this.state.activities.push(newAct);
     this.saveState();
+    syncManager.syncActivity(newAct);
   }
 
   deleteActivity(id) {
     this.state.activities = this.state.activities.filter(a => a.id !== id);
     this.saveState();
+    syncManager.syncActivity({ id }, true);
   }
 
   // --- Attendance (Present / Absent) ---
@@ -297,6 +307,7 @@ class Store {
     }
     this.state.attendance[date][studentId] = status;
     this.saveState();
+    syncManager.syncAttendance(date, studentId, status);
   }
 
   markAllPresent(date) {
@@ -305,6 +316,7 @@ class Store {
     }
     this.state.students.forEach(s => {
       this.state.attendance[date][s.id] = "present";
+      syncManager.syncAttendance(date, s.id, "present");
     });
     this.saveState();
   }
@@ -318,17 +330,18 @@ class Store {
       room: violation.room,
       date: violation.date || new Date().toISOString().split("T")[0],
       reason: violation.reason,
-      severity: violation.severity || "low",
       status: "pending",
       reporter: violation.reporter || "Мураббӣ"
     };
     this.state.violations.unshift(newViol);
     this.saveState();
+    syncManager.syncViolation(newViol);
   }
 
   resolveViolation(id) {
     this.state.violations = this.state.violations.map(v => v.id === id ? { ...v, status: "resolved" } : v);
     this.saveState();
+    syncManager.syncViolation({ id }, true);
   }
 
   // --- Cleanliness 5 criteria (Max 50 points) ---
@@ -364,6 +377,8 @@ class Store {
       item.rank = idx + 1;
     });
     this.saveState();
+    syncManager.syncCleanliness(entry);
+  }
   }
 
   // --- Quick Stats helper ---
