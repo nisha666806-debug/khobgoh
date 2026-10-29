@@ -122,7 +122,7 @@ export const translations = {
     tea_title: "Чойнӯшӣ ва ошхона",
     tea_subtitle: "Навбатдории самовор, хӯрок ва захираи маҳсулот",
     tea_samovar_duty: "Навбатдори чой",
-    tea_recipes: "Ресептҳои чой ва нӯшокиҳо",
+    tea_recipes: "Ретсепти менюи чойнӯшӣ",
 
     // Settings
     settings_title: "Танзимоти система",

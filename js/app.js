@@ -188,28 +188,6 @@ function renderApp() {
           </div>
 
           <div style="display:flex; align-items:center; gap:8px;">
-            <!-- Real-time Cloud Sync & Auth Button -->
-            ${syncManager.currentUser ? `
-              <button 
-                class="btn btn-secondary btn-sm" 
-                onclick="window.khobgoh.openUserAccountModal()"
-                style="display:flex; align-items:center; gap:6px; background:#ecfdf5; border-color:#a7f3d0; color:#065f46; font-weight:700;"
-                title="Синхронизатсияи зинда бо дигар кормандон фаъол аст!">
-                <span style="font-size:12px;">☁️</span>
-                <span style="max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px;">
-                  ${syncManager.currentUser.email.split('@')[0]}
-                </span>
-              </button>
-            ` : `
-              <button 
-                class="btn btn-primary btn-sm" 
-                onclick="window.khobgoh.openLoginModal()" 
-                style="padding:6px 12px; font-size:12px;"
-                title="Воридшавӣ барои синхронизатсия">
-                🔑 Воридшавӣ
-              </button>
-            `}
-
             <!-- Language Quick Switcher -->
             <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.toggleLanguage()" title="Ивази забон (Language)">
               🌐 ${state.lang.toUpperCase()}
@@ -221,33 +199,6 @@ function renderApp() {
             </button>
           </div>
         </header>
-
-        <!-- Prominent Real-time Cloud Sync Banner -->
-        ${syncManager.currentUser ? `
-          <div class="sync-banner sync-banner-success">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:16px;">🟢</span>
-              <div>
-                <b>Синхронизатсияи зинда фаъол аст:</b> Пайваст бо <b>${syncManager.currentUser.email}</b> (${currentRoleLabel})
-              </div>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openUserAccountModal()" style="font-size:12px; padding:4px 10px;">
-              Ҳолати ҳисоб ⚙️
-            </button>
-          </div>
-        ` : `
-          <div class="sync-banner sync-banner-warning">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:16px;">☁️</span>
-              <div>
-                <b>Ҳолати офлайн (Синхронизатсия пайваст нест):</b> Барои пайваст шудан ба база ва ҳамзамон дидани амалҳои дигар кормандон ба ҳисоб ворид шавед.
-              </div>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="window.khobgoh.openLoginModal()" style="font-weight:700; padding:6px 14px; font-size:12px;">
-              🔑 Пайвастшавӣ / Бақайдгирӣ
-            </button>
-          </div>
-        `}
 
         <!-- Dynamic Page View -->
         <div id="view-container">
@@ -1001,8 +952,13 @@ window.khobgoh = {
     const body = `
       <form id="addRoomForm" onsubmit="window.khobgoh.submitAddCustomRoom(event)">
         <div class="form-group">
-          <label class="form-label">Рақами ҳуҷра (масалан: 108, 204, 301) *</label>
-          <input type="text" id="customRoomId" class="form-control" required placeholder="Рақами ҳуҷраро нависед...">
+          <label class="form-label">Номи ҳуҷра *</label>
+          <input type="text" id="customRoomName" class="form-control" required placeholder="масалан: Ҳуҷраи Сино, Ҳуҷраи 108">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Рақами ҳуҷра (дар қисми поёнӣ) *</label>
+          <input type="text" id="customRoomId" class="form-control" required placeholder="масалан: 108, 204, 301">
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
@@ -1036,15 +992,16 @@ window.khobgoh = {
 
   submitAddCustomRoom(e) {
     e.preventDefault();
+    const name = document.getElementById("customRoomName")?.value.trim();
     const id = document.getElementById("customRoomId")?.value.trim();
     const cap = document.getElementById("customRoomCap")?.value;
     const floor = document.getElementById("customRoomFloor")?.value;
     const type = document.getElementById("customRoomType")?.value;
 
     if (!id) return;
-    store.addCustomRoom(id, cap, floor, type);
+    store.addCustomRoom(id, cap, floor, type, "", name);
     closeModal();
-    showToast(`Ҳуҷраи ${id} бомуваффақият сабт шуд!`, "success");
+    showToast(`Ҳуҷраи ${id} (${name || id}) бомуваффақият сабт шуд!`, "success");
   },
 
   openAddSupervisorRoomModal() {
@@ -1055,8 +1012,12 @@ window.khobgoh = {
     const body = `
       <form id="addSupRoomForm" onsubmit="window.khobgoh.submitAddSupervisorRoom(event)">
         <div class="form-group">
-          <label class="form-label">Рақами ҳуҷраи мураббиён (масалан: 201, 202, 203, 204) *</label>
-          <input type="text" id="supRoomId" class="form-control" required placeholder="Рақами ҳуҷра...">
+          <label class="form-label">Номи ҳуҷра *</label>
+          <input type="text" id="supRoomName" class="form-control" required placeholder="масалан: Ҳуҷраи Мураббиён 201">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Рақами ҳуҷра (дар қисми поёнӣ) *</label>
+          <input type="text" id="supRoomId" class="form-control" required placeholder="масалан: 201, 202, 203">
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
@@ -1079,13 +1040,14 @@ window.khobgoh = {
 
   submitAddSupervisorRoom(e) {
     if (e && e.preventDefault) e.preventDefault();
+    const name = document.getElementById("supRoomName")?.value.trim();
     const id = document.getElementById("supRoomId")?.value.trim();
     const cap = Number(document.getElementById("supRoomCap")?.value) || 4;
     const floor = Number(document.getElementById("supRoomFloor")?.value) || 2;
     if (!id) return;
-    store.addCustomRoom(id, cap, floor, "supervisor");
+    store.addCustomRoom(id, cap, floor, "supervisor", "", name);
     closeModal();
-    showToast(`Ҳуҷраи мураббиён №${id} илова шуд!`, "success");
+    showToast(`Ҳуҷраи мураббиён №${id} (${name || id}) илова шуд!`, "success");
   },
 
   openEditRoomModal(roomId) {
@@ -1100,7 +1062,11 @@ window.khobgoh = {
       <form id="editRoomForm" onsubmit="window.khobgoh.saveRoomEdits('${roomId}', event)">
         <div class="form-group">
           <label class="form-label">Номи ҳуҷра *</label>
-          <input type="text" id="editRoomName" class="form-control" value="${room.name || (room.type === 'supervisor' ? 'Мураббиён ' + room.id : 'Ҳуҷраи ' + room.id)}" required>
+          <input type="text" id="editRoomName" class="form-control" value="${room.name || (room.type === 'supervisor' ? 'Мураббиён ' + room.id : 'Ҳуҷраи ' + room.id)}" required placeholder="Номи ҳуҷра...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Рақами ҳуҷра (дар қисми поёнӣ) *</label>
+          <input type="text" id="editRoomId" class="form-control" value="${room.id}" required placeholder="Рақами ҳуҷра, масалан: 101">
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
@@ -1133,15 +1099,16 @@ window.khobgoh = {
   saveRoomEdits(roomId, e) {
     if (e && e.preventDefault) e.preventDefault();
     const name = document.getElementById("editRoomName")?.value.trim();
+    const newId = document.getElementById("editRoomId")?.value.trim();
     const capacity = Number(document.getElementById("editRoomCap")?.value);
     const floor = Number(document.getElementById("editRoomFloor")?.value);
     const type = document.getElementById("editRoomType")?.value;
 
-    if (!capacity) return;
+    if (!capacity || !newId) return;
 
-    store.updateRoom(roomId, { name, capacity, floor, type });
+    store.updateRoom(roomId, { id: newId, name, capacity, floor, type });
     closeModal();
-    showToast(`Ҳуҷраи ${roomId} бомуваффақият нав карда шуд!`, "success");
+    showToast(`Ҳуҷраи ${newId} (${name || newId}) бомуваффақият сабт шуд!`, "success");
   },
 
   deleteRoom(roomId) {
@@ -1255,21 +1222,21 @@ window.khobgoh = {
 
   openAddTeaRecipeModal() {
     if (!store.canManageTea()) {
-      showToast("Танҳо Сармураббӣ ё Мудир метавонанд ресептро илова кунанд!", "error");
+      showToast("Танҳо Сармураббӣ ё Мудир метавонанд менюи чойнӯширо илова кунанд!", "error");
       return;
     }
     const body = `
       <form id="teaRecipeForm" onsubmit="window.khobgoh.submitNewTeaRecipe(event)">
         <div class="form-group">
-          <label class="form-label">Номи чой *</label>
-          <input type="text" id="recipeName" class="form-control" required placeholder="Масалан: Чойи кабуд бо лиму ва наъно">
+          <label class="form-label">Номи меню (чой ё хӯроки сабук) *</label>
+          <input type="text" id="recipeName" class="form-control" required placeholder="Масалан: Чойи кабуд бо лиму, Ширчой, Субҳонаи сабук">
         </div>
         <div class="form-group">
-          <label class="form-label">Таркиб ва компонентҳо *</label>
-          <textarea id="recipeIngredients" class="form-control" rows="3" required placeholder="Чойи кабуди рақами 95, наъно, лиму, шакар ё набот..."></textarea>
+          <label class="form-label">Таркиби меню ва компонентҳо *</label>
+          <textarea id="recipeIngredients" class="form-control" rows="3" required placeholder="Чойи кабуди рақами 95, наъно, лиму, кулча, қаймоқ..."></textarea>
         </div>
         <div class="form-group">
-          <label class="form-label">Вақти дамхӯрӣ *</label>
+          <label class="form-label">Вақти омодашавӣ / дамхӯрӣ *</label>
           <input type="text" id="recipeTime" class="form-control" value="10 дақиқа" required placeholder="Масалан: 10 дақиқа, 15 дақиқа">
         </div>
       </form>
@@ -1278,7 +1245,7 @@ window.khobgoh = {
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
       <button class="btn btn-primary" onclick="window.khobgoh.submitNewTeaRecipe()">Сабт кардан</button>
     `;
-    openModal("Иловаи ресепти нави чой (Сармураббӣ)", body, footer);
+    openModal("Иловаи ретсепти менюи чойнӯшӣ", body, footer);
   },
 
   submitNewTeaRecipe(e) {
@@ -1289,7 +1256,7 @@ window.khobgoh = {
     if (!name || !ingredients) return;
     store.addTeaRecipe({ name, ingredients, time });
     closeModal();
-    showToast(`Ресепти «${name}» бомуваффақият сабт шуд!`, "success");
+    showToast(`Менюи «${name}» бомуваффақият сабт шуд!`, "success");
   },
 
   openEditTeaRecipeModal(id) {
@@ -1300,15 +1267,15 @@ window.khobgoh = {
     const body = `
       <form id="editTeaRecipeForm" onsubmit="window.khobgoh.saveTeaRecipeEdits('${id}', event)">
         <div class="form-group">
-          <label class="form-label">Номи чой *</label>
+          <label class="form-label">Номи меню *</label>
           <input type="text" id="editRecipeName" class="form-control" value="${r.name}" required>
         </div>
         <div class="form-group">
-          <label class="form-label">Таркиб ва компонентҳо *</label>
+          <label class="form-label">Таркиби меню ва компонентҳо *</label>
           <textarea id="editRecipeIngredients" class="form-control" rows="3" required>${r.ingredients || ''}</textarea>
         </div>
         <div class="form-group">
-          <label class="form-label">Вақти дамхӯрӣ *</label>
+          <label class="form-label">Вақти омодашавӣ *</label>
           <input type="text" id="editRecipeTime" class="form-control" value="${r.time || '10 дақиқа'}" required>
         </div>
       </form>
@@ -1317,7 +1284,7 @@ window.khobgoh = {
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
       <button class="btn btn-primary" onclick="window.khobgoh.saveTeaRecipeEdits('${id}')">Сабт кардан</button>
     `;
-    openModal("Таҳрири ресепти чой", body, footer);
+    openModal("Таҳрири ретсепти менюи чойнӯшӣ", body, footer);
   },
 
   saveTeaRecipeEdits(id, e) {
@@ -1329,16 +1296,16 @@ window.khobgoh = {
 
     store.updateTeaRecipe(id, { name, ingredients, time });
     closeModal();
-    showToast("Ресепт нав карда шуд!", "success");
+    showToast("Менюи чойнӯшӣ нав карда шуд!", "success");
   },
 
   deleteTeaRecipe(id) {
     if (!store.canManageTea()) return;
     const r = (store.state.tea?.recipes || []).find(x => x.id === id);
     if (!r) return;
-    if (confirm(`Оё мехоҳед ресепти «${r.name}»-ро хориҷ кунед?`)) {
+    if (confirm(`Оё мехоҳед менюи «${r.name}»-ро хориҷ кунед?`)) {
       store.deleteTeaRecipe(id);
-      showToast(`Ресепт хориҷ карда шуд!`, "info");
+      showToast(`Менюи чойнӯшӣ хориҷ карда шуд!`, "info");
     }
   },
 
@@ -1975,8 +1942,8 @@ window.khobgoh = {
           <div id="loginErrorBox" style="display:none; padding:10px 14px; margin-bottom:12px; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; font-size:13px; color:#991b1b; line-height:1.4;"></div>
 
           <div class="form-group">
-            <label class="form-label">Email корманд (Роҳбар ё мураббӣ) *</label>
-            <input type="email" id="loginEmail" class="form-control" required placeholder="nom@khobgoh.tj">
+            <label class="form-label">Телефон ё Email *</label>
+            <input type="text" id="loginEmail" class="form-control" required placeholder="+992 900 00 00 00 ё nom@khobgoh.tj">
           </div>
 
           <div class="form-group">
@@ -1988,32 +1955,32 @@ window.khobgoh = {
           </div>
 
           <div style="font-size:12px; color:var(--text-muted); margin-top:8px;">
-            Мураббии нав ҳастед? <a href="javascript:void(0)" onclick="window.khobgoh.openLoginModal('register')" style="color:var(--primary); font-weight:700;">Бо коди даъват бақайд гиред →</a>
+            Мураббии нав ҳастед? <a href="javascript:void(0)" onclick="window.khobgoh.openLoginModal('register')" style="color:var(--primary); font-weight:700;">Бо як қадам худро бақайд гиред →</a>
           </div>
         </form>
       ` : isRegister ? `
         <form id="regForm" onsubmit="window.khobgoh.submitSupervisorRegistration(event); return false;">
           <div style="text-align:center; margin-bottom:14px;">
             <div style="font-size:36px; margin-bottom:4px;">📋</div>
-            <h3 style="margin:0; font-size:16px; font-weight:800;">Бақайдгирии мураббӣ</h3>
-            <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Коди даъватро аз Роҳбар (Manager) гиред</p>
+            <h3 style="margin:0; font-size:16px; font-weight:800;">Бақайдгирии фаврии мураббӣ</h3>
+            <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Бидуни коди даъват — мустақиман сабти ном шавед</p>
           </div>
 
           <div id="regErrorBox" style="display:none; padding:10px 14px; margin-bottom:12px; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; font-size:13px; color:#991b1b; line-height:1.4;"></div>
 
           <div class="form-group">
-            <label class="form-label">Email мураббӣ *</label>
-            <input type="email" id="regEmail" class="form-control" required placeholder="murabbi@khobgoh.tj">
+            <label class="form-label">Ному насаби пурра *</label>
+            <input type="text" id="regName" class="form-control" required placeholder="масалан: Сафаров Ҷамшед">
           </div>
 
           <div class="form-group">
-            <label class="form-label">Коди даъват (Invite Code) *</label>
-            <input type="text" id="regCode" class="form-control" required placeholder="KHG-XXXXXXXX" style="font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+            <label class="form-label">Телефон ё Email *</label>
+            <input type="text" id="regContact" class="form-control" required placeholder="+992 900 00 00 00 ё nom@khobgoh.tj">
           </div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div class="form-group">
-              <label class="form-label">Пароли нав *</label>
+              <label class="form-label">Парол *</label>
               <input type="password" id="regPassword" class="form-control" required minlength="6" placeholder="камаш 6 аломат">
             </div>
             <div class="form-group">
@@ -2053,14 +2020,14 @@ window.khobgoh = {
 
   async submitLogin(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const email = document.getElementById("loginEmail")?.value?.trim();
+    const contact = document.getElementById("loginEmail")?.value?.trim();
     const password = document.getElementById("loginPassword")?.value;
     const errorBox = document.getElementById("loginErrorBox");
     const submitBtn = document.getElementById("loginSubmitBtn");
 
-    if (!email || !password) {
+    if (!contact || !password) {
       if (errorBox) {
-        errorBox.textContent = "Лутфан Email ва паролро ворид намоед.";
+        errorBox.textContent = "Лутфан Телефон/Email ва паролро ворид намоед.";
         errorBox.style.display = "block";
       }
       return;
@@ -2074,16 +2041,17 @@ window.khobgoh = {
 
     try {
       showToast("Дар ҳоли санҷиш ва пайвастшавӣ...", "info");
-      await syncManager.login(email, password);
+      await syncManager.login(contact, password);
       closeModal();
       showToast("Шумо бомуваффақият ворид шудед! Синхронизатсияи зинда фаъол шуд.", "success");
+      renderApp();
     } catch (err) {
       console.error("Login failed:", err);
-      let message = "Email ё парол нодуруст аст.";
+      let message = "Телефон/Email ё парол нодуруст аст.";
       if (err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found") {
-        message = "Email ё парол нодуруст аст (ё чунин корбар ҳанӯз дар база вуҷуд надорад).";
+        message = "Телефон/Email ё парол нодуруст аст (ё чунин корбар ҳанӯз дар база вуҷуд надорад).";
       } else if (err.code === "auth/invalid-email") {
-        message = "Формати Email нодуруст аст.";
+        message = "Формати телефон ё Email нодуруст аст.";
       } else if (err.code === "auth/network-request-failed") {
         message = "Пайвасти интернет бо сервер қатъ шуд.";
       } else if (err.message) {
@@ -2096,7 +2064,7 @@ window.khobgoh = {
           <div style="margin-top:8px; font-size:12px; color:#4b5563;">
             Оё мехоҳед ин ҳисобро ҳамчун роҳбари нав (Manager) сабти ном кунед?
           </div>
-          <button type="button" class="btn btn-outline btn-sm" onclick="window.khobgoh.registerDirectManager('${email}')" style="margin-top:8px; width:100%; font-size:12px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="window.khobgoh.registerDirectManager('${contact}')" style="margin-top:8px; width:100%; font-size:12px;">
             ✨ Сабти номи ин ҳисоб дар база
           </button>
         `;
@@ -2128,6 +2096,7 @@ window.khobgoh = {
       await syncManager.registerManager(email, password);
       closeModal();
       showToast("Ҳисоби нав бомуваффақият сохта шуд ва ворид гардид!", "success");
+      renderApp();
     } catch (err) {
       console.error("Direct register error:", err);
       if (errorBox) {
@@ -2140,7 +2109,7 @@ window.khobgoh = {
   async forgotPassword() {
     const email = document.getElementById("loginEmail")?.value?.trim();
     if (!email) {
-      alert("Лутфан аввал Email-и худро нависед.");
+      alert("Лутфан аввал Email ё телефони худро нависед.");
       return;
     }
     try {
@@ -2153,14 +2122,14 @@ window.khobgoh = {
 
   async submitSupervisorRegistration(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const email = document.getElementById("regEmail")?.value?.trim();
-    const code = document.getElementById("regCode")?.value?.trim();
+    const name = document.getElementById("regName")?.value?.trim();
+    const contact = document.getElementById("regContact")?.value?.trim();
     const p1 = document.getElementById("regPassword")?.value;
     const p2 = document.getElementById("regPassword2")?.value;
     const errorBox = document.getElementById("regErrorBox");
     const submitBtn = document.getElementById("regSubmitBtn");
 
-    if (!email || !code || !p1 || !p2) {
+    if (!name || !contact || !p1 || !p2) {
       if (errorBox) {
         errorBox.textContent = "Ҳамаи майдонҳоро пур кунед.";
         errorBox.style.display = "block";
@@ -2189,14 +2158,15 @@ window.khobgoh = {
     }
 
     try {
-      showToast("Дар ҳоли бақайдгирӣ дар система...", "info");
-      await syncManager.registerSupervisor({ email, code, password: p1 });
+      showToast("Дар ҳоли бақайдгирӣ...", "info");
+      await syncManager.registerSupervisorEasy({ name, contact, password: p1 });
       closeModal();
-      showToast("Мураббӣ бомуваффақият сабт шуд! Синхронизатсия фаъол гардид.", "success");
+      showToast(`Мураббӣ ${name} бомуваффақият сабт шуд ва ба система ворид гардид!`, "success");
+      renderApp();
     } catch (err) {
       console.error("Registration error:", err);
       if (errorBox) {
-        errorBox.textContent = "Хатогӣ: " + (err.message || "Коди даъват ё email нодуруст аст.");
+        errorBox.textContent = "Хатогӣ: " + (err.message || "Хатогӣ дар бақайдгирӣ.");
         errorBox.style.display = "block";
       }
       showToast(err.message || "Хатогӣ дар бақайдгирӣ.", "error");

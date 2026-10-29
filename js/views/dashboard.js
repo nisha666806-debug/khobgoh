@@ -201,23 +201,17 @@ export function renderDashboard() {
             ${store.state.rooms.filter(r => r.type === 'student').map(room => {
               const occupied = store.state.students.filter(s => s.room === room.id && s.status === 'Active').length;
               const isFull = occupied >= room.capacity;
-              const leaderId = store.state.roomLeaders ? store.state.roomLeaders[room.id] : null;
-              const leader = store.state.students.find(s => s.id === leaderId);
               const supInCharge = (store.state.supervisors || []).find(s => s.id === room.supervisorId);
 
               return `
-                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:${isFull ? 'var(--surface-muted)' : 'var(--surface)'}; text-align:center; transition:transform 0.1s ease;">
-                  <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${room.name}</div>
-                  <div style="font-size:12px; font-weight:600; color:${isFull ? '#ef4444' : '#10b981'}; margin-bottom:4px;">
+                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:10px 8px; border:1px solid var(--border); border-radius:var(--radius-md); background:${isFull ? 'var(--surface-muted)' : 'var(--surface)'}; text-align:center; transition:transform 0.1s ease;">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:2px; color:var(--text-main);">${room.name || 'Ҳуҷра'}</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Рақам: <b>№ ${room.id}</b></div>
+                  <div style="font-size:12px; font-weight:700; color:${isFull ? '#ef4444' : '#10b981'}; margin-bottom:4px;">
                     ${occupied} / ${room.capacity} ҷой
                   </div>
-                  ${leader ? `
-                    <div style="font-size:10px; color:var(--amber-600); font-weight:700; background:rgba(245, 158, 11, 0.1); padding:2px 4px; border-radius:4px; margin-bottom:2px;" title="Сардори ҳуҷра: ${leader.name}">
-                      👑 ${(leader.name || '').split(' ')[0]}
-                    </div>
-                  ` : ''}
                   ${supInCharge ? `
-                    <div style="font-size:9px; color:var(--indigo-700); font-weight:600; background:rgba(99, 102, 241, 0.1); padding:1px 4px; border-radius:4px;" title="Мураббии масъул: ${supInCharge.name}">
+                    <div style="font-size:9px; color:var(--indigo-700); font-weight:600; background:rgba(99, 102, 241, 0.1); padding:2px 4px; border-radius:4px;" title="Мураббии масъул: ${supInCharge.name}">
                       👔 ${(supInCharge.name || '').split(' ')[0]}
                     </div>
                   ` : ''}
@@ -244,8 +238,9 @@ export function renderDashboard() {
               const leader = (store.state.supervisors || []).find(s => s.id === leaderId);
 
               return `
-                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:12px; border:1px solid #c7d2fe; border-left:3px solid var(--indigo-500); border-radius:var(--radius-md); background:#f8fafc; text-align:center;">
-                  <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${room.name || 'Мураббиён ' + room.id}</div>
+                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:10px 8px; border:1px solid #c7d2fe; border-left:3px solid var(--indigo-500); border-radius:var(--radius-md); background:#f8fafc; text-align:center;">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:2px; color:var(--text-main);">${room.name || 'Мураббиён ' + room.id}</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Рақам: <b>№ ${room.id}</b></div>
                   <div style="font-size:12px; font-weight:600; color:var(--indigo-700); margin-bottom:4px;">
                     ${roomSups.length} / ${room.capacity || 4} мураббӣ
                   </div>

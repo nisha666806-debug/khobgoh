@@ -7,7 +7,7 @@ export function renderTea() {
   const recipes = tea.recipes || [];
   const classSchedule = tea.classSchedule || [];
   const canManage = store.canManageTea();
-  const selectedClass = window.khobgoh?.selectedTeaClass || "";
+  const selectedClass = (typeof window !== "undefined" && window.khobgoh?.selectedTeaClass) || "";
 
   const classes = ["Синфи 7", "Синфи 8", "Синфи 9", "Синфи 10", "Синфи 11"];
 
@@ -22,12 +22,12 @@ export function renderTea() {
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
         <div>
           <h1 style="font-size:24px; font-weight:800; margin:0 0 4px 0; color:var(--text-main);">Чойнӯшӣ ва ошхона</h1>
-          <p style="margin:0; color:var(--text-muted); font-size:14px;">Ҷадвали соатҳои чойнӯшии ҳар як синф ва менюи чой аз ҷониби Сармураббӣ</p>
+          <p style="margin:0; color:var(--text-muted); font-size:14px;">Ҷадвали соатҳои чойнӯшии ҳар як синф ва ретсепти менюи чойнӯшӣ аз ҷониби Сармураббӣ</p>
         </div>
         ${canManage ? `
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-outline" onclick="window.khobgoh.openAddTeaRecipeModal()">
-              + Ресепти нави чой
+              + Менюи чойнӯшӣ
             </button>
             <button class="btn btn-primary" onclick="window.khobgoh.openAddClassTeaModal()">
               + Иловаи соати чойнӯшӣ
@@ -125,13 +125,13 @@ export function renderTea() {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
           <div>
             <h3 style="margin:0; font-size:17px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-              <span>🌿 Меню ва ресептҳои чойи хобгоҳ</span>
+              <span>🌿 Ретсепти менюи чойнӯшӣ</span>
             </h3>
-            <small style="color:var(--text-muted);">Ресептҳои тасдиқшуда аз ҷониби Сармураббӣ</small>
+            <small style="color:var(--text-muted);">Ретсептҳо ва номгӯи тасдиқшудаи менюи чойнӯшӣ аз ҷониби Сармураббӣ</small>
           </div>
           ${canManage ? `
             <button class="btn btn-outline btn-sm" onclick="window.khobgoh.openAddTeaRecipeModal()">
-              + Иловаи ресепт
+              + Иловаи менюи чойнӯшӣ
             </button>
           ` : ''}
         </div>
@@ -139,7 +139,7 @@ export function renderTea() {
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
           ${recipes.length === 0 ? `
             <div style="grid-column: 1 / -1; text-align:center; padding:32px; color:var(--text-muted);">
-              Ҳоло ягон ресепти чой сабт нашудааст.
+              Ҳоло ягон менюи чойнӯшӣ сабт нашудааст.
             </div>
           ` : recipes.map(r => `
             <div style="padding:18px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface); display:flex; flex-direction:column; justify-content:space-between; gap:12px; box-shadow:var(--shadow-sm);">
@@ -149,7 +149,7 @@ export function renderTea() {
                   <span class="status-pill status-permission" style="font-size:10px;">Сармураббӣ</span>
                 </div>
                 <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px; line-height:1.5;">
-                  <strong>Таркиб:</strong> ${r.ingredients || '—'}
+                  <strong>Таркиби меню:</strong> ${r.ingredients || '—'}
                 </div>
               </div>
 

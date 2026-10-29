@@ -36,8 +36,6 @@ export function renderRooms() {
         ${studentRooms.map(room => {
           const roomStudents = students.filter(s => s.room === room.id && s.status === 'Active');
           const occupiedCount = roomStudents.length;
-          const leaderId = store.state.roomLeaders ? store.state.roomLeaders[room.id] : null;
-          const leader = students.find(s => s.id === leaderId);
           const supInCharge = supervisors.find(s => s.id === room.supervisorId);
 
           return `
@@ -45,9 +43,11 @@ export function renderRooms() {
               <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div>
                   <h3 style="margin:0; font-size:17px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                    <span>${room.name || 'Ҳуҷраи ' + room.id}</span>
+                    <span>${room.name || 'Ҳуҷра'}</span>
                   </h3>
-                  <small style="color:var(--text-muted);">Рақам: <b>${room.id}</b> • Ошёнаи ${room.floor || 1} • Иқтидор: ${room.capacity} ҷой</small>
+                  <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">
+                    Рақами ҳуҷра: <b style="color:var(--text-main); font-size:14px;">№ ${room.id}</b> • Ошёнаи ${room.floor || 1} • Иқтидор: ${room.capacity} ҷой
+                  </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="status-pill ${occupiedCount >= room.capacity ? 'status-absent' : 'status-active'}">
@@ -64,7 +64,7 @@ export function renderRooms() {
                 </div>
               </div>
 
-              <!-- Supervisor in charge (Requirement 4) -->
+              <!-- Supervisor in charge -->
               <div style="padding:8px 12px; background:rgba(99, 102, 241, 0.08); border:1px solid rgba(99, 102, 241, 0.25); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-size:12px; color:var(--indigo-700); font-weight:700; display:flex; align-items:center; gap:6px;">
                   <span>👔 Мураббии масъул:</span>
@@ -77,31 +77,17 @@ export function renderRooms() {
                 ` : ''}
               </div>
 
-              <!-- Student Room Leader (Сардори ҳуҷра) -->
-              <div style="padding:8px 12px; background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.25); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-size:12px; color:var(--amber-700); font-weight:700; display:flex; align-items:center; gap:6px;">
-                  <span>👑 Сардори ҳуҷра:</span>
-                  <span style="color:var(--text-main); font-weight:800;">${leader ? leader.name : 'Таъин нашудааст'}</span>
-                </div>
-                ${canManage ? `
-                  <button class="btn btn-secondary btn-sm" style="padding:2px 8px; font-size:11px;" onclick="window.khobgoh.openSetRoomLeaderModal('${room.id}')">
-                    Таъин
-                  </button>
-                ` : ''}
-              </div>
-
               <!-- Bed Slots Grid -->
               <div class="bed-slots-grid">
                 ${Array.from({ length: room.capacity }).map((_, idx) => {
                   const bedNum = idx + 1;
                   const occupant = roomStudents.find(s => Number(s.bed) === bedNum);
-                  const isOccupantLeader = occupant && occupant.id === leaderId;
 
                   if (occupant) {
                     return `
                       <div class="bed-slot occupied" title="${occupant.name} (${occupant.course})" onclick="window.khobgoh.viewStudentPass('${occupant.id}')">
                         <span style="font-size:11px; font-weight:800; display:flex; align-items:center; gap:2px;">
-                          №${bedNum} ${isOccupantLeader ? '👑' : ''}
+                          №${bedNum}
                         </span>
                         <span style="font-size:10px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${occupant.name.split(' ')[0]}</span>
                       </div>
@@ -147,7 +133,7 @@ export function renderRooms() {
               <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div>
                   <h3 style="margin:0; font-size:17px; font-weight:800; color:var(--text-main);">${room.name || 'Мураббиён ' + room.id}</h3>
-                  <small style="color:var(--text-muted);">Рақами ҳуҷра: <b>${room.id}</b> • Ошёнаи ${room.floor || 2} • Иқтидор: ${room.capacity || 4} ҷой</small>
+                  <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Рақами ҳуҷра: <b style="color:var(--text-main); font-size:14px;">№ ${room.id}</b> • Ошёнаи ${room.floor || 2} • Иқтидор: ${room.capacity || 4} ҷой</div>
                 </div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="status-pill status-permission">

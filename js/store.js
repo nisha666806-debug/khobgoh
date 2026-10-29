@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v3_3";
+const STORAGE_KEY = "khobgoh_state_v3_4";
 
 class Store {
   constructor() {
@@ -223,10 +223,12 @@ class Store {
   }
 
   // Add or configure custom room
-  addCustomRoom(id, capacity = 8, floor = 1, type = "student", supervisorId = "") {
+  addCustomRoom(id, capacity = 8, floor = 1, type = "student", supervisorId = "", name = "") {
     const roomId = String(id).trim();
     const existing = this.state.rooms.find(r => r.id === roomId);
+    const roomName = name ? name.trim() : (type === "supervisor" ? `Мураббиён ${roomId}` : `Ҳуҷраи ${roomId}`);
     if (existing) {
+      existing.name = roomName;
       existing.capacity = Number(capacity);
       existing.floor = Number(floor);
       existing.type = type;
@@ -234,7 +236,7 @@ class Store {
     } else {
       this.state.rooms.push({
         id: roomId,
-        name: type === "supervisor" ? `Мураббиён ${roomId}` : `Ҳуҷраи ${roomId}`,
+        name: roomName,
         floor: Number(floor) || (parseInt(roomId[0]) || 1),
         type,
         capacity: Number(capacity),

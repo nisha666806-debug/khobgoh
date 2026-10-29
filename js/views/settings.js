@@ -1,5 +1,6 @@
-// Khobgoh Settings View v2.2
+// Khobgoh Settings View v3.0
 import { store } from "../store.js";
+import { syncManager } from "../sync.js";
 
 export function renderSettings() {
   const t = (k) => store.t(k);
@@ -11,6 +12,59 @@ export function renderSettings() {
       <div style="margin-bottom:24px;">
         <h1 style="font-size:24px; font-weight:800; margin:0 0 4px 0; color:var(--text-main);">${t('settings_title')}</h1>
         <p style="margin:0; color:var(--text-muted); font-size:14px;">${t('settings_subtitle')}</p>
+      </div>
+
+      <!-- Cloud Synchronization & Account (Moved from Topbar/Dashboard - Requirement 3) -->
+      <div class="card" style="margin-bottom:20px; border-left:4px solid var(--primary);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="margin:0 0 4px 0; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span>☁️ Синхронизатсияи абрӣ ва пайвастшавӣ</span>
+            </h3>
+            <p style="margin:0; font-size:13px; color:var(--text-muted);">
+              Ҳамоҳангсозии зинда байни телефонҳои ҳамаи мураббиён ва ҳифзи иттилоот
+            </p>
+          </div>
+          <div>
+            ${syncManager.currentUser ? `
+              <span class="status-pill status-active" style="font-size:12px; font-weight:700;">🟢 Синхронизатсия фаъол</span>
+            ` : `
+              <span class="status-pill status-absent" style="font-size:12px; font-weight:700;">⚠️ Ҳолати офлайн</span>
+            `}
+          </div>
+        </div>
+
+        ${syncManager.currentUser ? `
+          <div style="padding:14px; background:var(--surface-muted); border-radius:var(--radius-md); margin-bottom:12px; font-size:13px; line-height:1.5;">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+              <div>Почтаи пайвастшуда: <b>${syncManager.currentUser.email}</b></div>
+              <div style="color:var(--emerald-700); font-weight:700;">Ҳамаи тағйирот дар сония сабт мешаванд</div>
+            </div>
+            <div style="font-size:12px; color:var(--text-muted);">
+              Ҳангоми сабти давомот, тозагӣ ё навбатдории чой, иттилоот дарҳол ба дигар кормандон дастрас мегардад.
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.openUserAccountModal()">
+              ⚙️ Идоракунии ҳисоб
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="window.khobgoh.logoutUser()" style="color:#ef4444; border-color:#fca5a5;">
+              🚪 Баромадан аз ҳисоб
+            </button>
+          </div>
+        ` : `
+          <div style="padding:14px; background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-md); margin-bottom:12px; font-size:13px; color:#92400e; line-height:1.5;">
+            <b>Ҳолати офлайн:</b> Дар ин ҳолат маълумот танҳо дар ҳамин дастгоҳ нигоҳ дошта мешавад. Барои пайваст шудан ба базаи ягона ва ҳамкорӣ бо дигар мураббиён ба ҳисоб ворид шавед ё худро ба қайд гиред.
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="window.khobgoh.openLoginModal('login')">
+              🔑 Воридшавӣ ба ҳисоб
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="window.khobgoh.openLoginModal('register')">
+              📋 Бақайдгирии мураббии нав
+            </button>
+          </div>
+        `}
       </div>
 
       <!-- Official User Profile & Role (Requirement 7: Security - No Arbitrary Switching) -->

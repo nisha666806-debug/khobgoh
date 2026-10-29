@@ -25,15 +25,17 @@ class SyncManager {
       console.debug("Session restore:", e);
     }
 
-    window.addEventListener("online", () => {
-      this.isOnline = true;
-      if (window.khobgoh?.showToast) window.khobgoh.showToast("Пайвасти интернет барқарор шуд.", "info");
-    });
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => {
+        this.isOnline = true;
+        if (window.khobgoh?.showToast) window.khobgoh.showToast("Пайвасти интернет барқарор шуд.", "info");
+      });
 
-    window.addEventListener("offline", () => {
-      this.isOnline = false;
-      if (window.khobgoh?.showToast) window.khobgoh.showToast("Реҷаи офлайн фаъол аст.", "info");
-    });
+      window.addEventListener("offline", () => {
+        this.isOnline = false;
+        if (window.khobgoh?.showToast) window.khobgoh.showToast("Реҷаи офлайн фаъол аст.", "info");
+      });
+    }
   }
 
   async init(store) {
@@ -365,11 +367,96 @@ class SyncManager {
   }
 
   // --- Auth & Supervisor Registration Operations ---
-  async login(email, password) {
+  async login(emailOrPhone, password) {
     if (!this.fb) {
       this.fb = await import("./firebase.js");
     }
-    return await this.fb.signInWithEmailAndPassword(this.fb.auth, email, password);
+    let cleanEmail = emailOrPhone.trim().toLowerCase();
+    if (!cleanEmail.includes("@")) {
+      const digits = cleanEmail.replace(/[^0-9]/g, "");
+      cleanEmail = `${digits || 'user'}@khobgoh.tj`;
+    }
+    return await this.fb.signInWithEmailAndPassword(this.fb.auth, cleanEmail, password);
+  }
+
+  // Easy Supervisor Registration without invite code (Variant A)
+  async registerSupervisorEasy({ name, contact, password }) {
+    if (!this.fb) this.fb = await import("./firebase.js");
+
+    const trimmedContact = contact.trim();
+    let cleanEmail = trimmedContact.toLowerCase();
+    let phone = "";
+    if (cleanEmail.includes("@")) {
+      phone = "";
+    } else {
+      phone = trimmedContact;
+      const digits = trimmedContact.replace(/[^0-9]/g, "");
+      cleanEmail = `${digits || 'murabbi'}@khobgoh.tj`;
+    }
+
+    let cred;
+    try {
+      cred = await this.fb.createUserWithEmailAndPassword(this.fb.registrationAuth || this.fb.auth, cleanEmail, password);
+    } catch (e) {
+      if (e.code === "auth/email-already-in-use") {
+        cred = await this.fb.signInWithEmailAndPassword(this.fb.auth, cleanEmail, password);
+      } else {
+        throw e;
+      }
+    }
+
+    const userDoc = {
+      name: name.trim(),
+      email: cleanEmail,
+      phone: phone || "",
+      role: "supervisor",
+      status: "active",
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await this.fb.setDoc(this.fb.doc(this.fb.db, "users", cred.user.uid), userDoc, { merge: true });
+    } catch (e) {
+      console.warn("Could not save to Firestore user doc, proceeding with local state:", e);
+    }
+
+    if (this.store) {
+      const supExists = this.store.state.supervisors.some(s => s.email === cleanEmail || s.name === name.trim());
+      if (!supExists) {
+        this.store.state.supervisors.push({
+          id: `sup-${Date.now()}`,
+          name: name.trim(),
+          phone: phone || "",
+          email: cleanEmail,
+          role: "supervisor",
+          shift: "Рӯзона",
+          rooms: []
+        });
+        this.store.saveState();
+      }
+      this.store.state.activeRole = "supervisor";
+      this.store.state.currentUserEmail = cleanEmail;
+      this.store.state.isFirebaseConnected = true;
+    }
+
+    this.currentUser = cred.user;
+    this.userProfile = userDoc;
+
+    try {
+      localStorage.setItem("khobgoh_auth_session", JSON.stringify({
+        uid: cred.user.uid,
+        email: cleanEmail,
+        name: name.trim(),
+        role: "supervisor",
+        phone: phone || ""
+      }));
+    } catch (e) {}
+
+    if (this.store) {
+      this.store.notify();
+    }
+
+    return cred;
   }
 
   async registerManager(email, password) {
