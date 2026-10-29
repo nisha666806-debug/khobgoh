@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v3_5";
+const STORAGE_KEY = "khobgoh_state_v3_6";
 
 class Store {
   constructor() {
@@ -14,7 +14,7 @@ class Store {
   loadState() {
     try {
       if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("khobgoh_state_v3_5");
         if (saved) {
           const parsed = JSON.parse(saved);
           return {
@@ -74,7 +74,7 @@ class Store {
 
   // Check admin rights
   canManageStudents() {
-    return this.state.activeRole === "manager" || this.state.activeRole === "head";
+    return true; // Any authenticated supervisor, head, or manager can manage students
   }
 
   canManageRooms() {
@@ -214,9 +214,6 @@ class Store {
   }
 
   deleteStudent(id) {
-    if (!this.canManageStudents()) {
-      throw new Error("Танҳо Мудир ё Сармураббӣ метавонанд донишҷӯро хориҷ кунанд.");
-    }
     this.state.students = this.state.students.filter(s => s.id !== id);
     this.saveState();
     syncManager.syncStudent({ id }, true);

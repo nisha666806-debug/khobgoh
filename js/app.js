@@ -1569,8 +1569,9 @@ window.khobgoh = {
       try {
         store.deleteStudent(id);
         showToast(`${s.name} аз рӯйхат хориҷ карда шуд!`, "info");
+        renderApp();
       } catch (err) {
-        showToast(err.message, "error");
+        showToast(err.message || "Хатогӣ ҳангоми нест кардан", "error");
       }
     }
   },
@@ -1606,6 +1607,7 @@ window.khobgoh = {
     `;
 
     const footer = `
+      <button class="btn btn-danger" style="margin-right:auto;" onclick="window.khobgoh.closeModal(); window.khobgoh.deleteStudent('${s.id}')">🗑️ Нест кардан</button>
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
       <button class="btn btn-primary" onclick="window.khobgoh.saveStudentEdits('${s.id}')">Сабт кардан</button>
     `;
@@ -1623,12 +1625,12 @@ window.khobgoh = {
     store.updateStudent(id, { name, room, bed, course, phone });
     closeModal();
     showToast("Тағйирот сабт шуд!", "success");
+    renderApp();
   },
 
   viewStudentPass(id) {
     const s = store.state.students.find(x => x.id === id);
     if (!s) return;
-    const isLeader = store.state.roomLeaders[s.room] === s.id;
 
     const body = `
       <div id="studentPassCard" style="border:2px solid var(--emerald-600); border-radius:var(--radius-lg); padding:20px; background:#fff; color:#0f172a; box-shadow:var(--shadow-md);">
@@ -1645,9 +1647,8 @@ window.khobgoh = {
             👤
           </div>
           <div style="flex:1;">
-            <h2 style="font-size:18px; font-weight:800; margin:0 0 4px 0; display:flex; align-items:center; gap:6px;">
+            <h2 style="font-size:18px; font-weight:800; margin:0 0 4px 0;">
               <span>${s.name}</span>
-              ${isLeader ? `<span style="font-size:13px;" title="Сардори ҳуҷра">👑 Сардори ҳуҷра</span>` : ''}
             </h2>
             <div style="font-size:13px; color:#475569; margin-bottom:4px;"><b>Синф/Курс:</b> ${s.course}</div>
             <div style="font-size:13px; color:#475569; margin-bottom:4px;"><b>Ҳуҷра:</b> №${s.room} • <b>Кат (Ҷой):</b> №${s.bed}</div>
@@ -1663,6 +1664,8 @@ window.khobgoh = {
     `;
 
     const footer = `
+      <button class="btn btn-danger" style="margin-right:auto;" onclick="window.khobgoh.closeModal(); window.khobgoh.deleteStudent('${s.id}')">🗑️ Нест кардан</button>
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal(); window.khobgoh.editStudent('${s.id}')">✏️ Таҳрир</button>
       <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Пӯшидан</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Чоп кардан (Print)</button>
     `;

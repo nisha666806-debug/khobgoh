@@ -85,16 +85,18 @@ class SyncManager {
             window.khobgoh.showToast(`Пайваст бо абр: ${user.email}`, "success");
           }
         } else {
-          // If no active auth but user previously logged in and hasn't logged out explicitly, preserve cached session
+          // Even without active auth, shared cloud data remains accessible with open rules
           if (!this.userProfile) {
             this.currentUser = null;
             this.store.state.currentUserEmail = null;
-            this.store.state.isFirebaseConnected = false;
-            this.unsubscribeCollections();
           }
+          this.subscribeCollections();
         }
         this.store.notify();
       });
+
+      // Start listening to cloud collections immediately
+      this.subscribeCollections();
     } catch (err) {
       console.warn("Firebase background initialization deferred/offline:", err);
     }
@@ -106,11 +108,11 @@ class SyncManager {
   }
 
   subscribeCollections() {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     this.unsubscribeCollections();
 
     const db = this.fb.db;
-    const uid = this.currentUser.uid;
+    const uid = this.currentUser?.uid || "shared";
 
     // 1. Students collection listener (Full shared sync across all devices)
     try {
@@ -120,6 +122,9 @@ class SyncManager {
           const remoteList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           this.store.state.students = remoteList;
           this.store.saveState();
+          if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
+            window.khobgoh.renderApp();
+          }
         } else if (this.store.state.students?.length > 0) {
           // If remote is empty, seed initial students so all devices have shared data
           try {
@@ -292,15 +297,15 @@ class SyncManager {
 
   // --- Real-time Write Operations to Firestore ---
   async syncStudent(student, isDelete = false) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
-      const ref = this.fb.doc(this.fb.db, "students", student.id);
+      const ref = this.fb.doc(this.fb.db, "students", String(student.id));
       if (isDelete) {
         await this.fb.deleteDoc(ref);
       } else {
         await this.fb.setDoc(ref, {
           ...student,
-          supervisorId: student.supervisorId || this.currentUser.uid,
+          supervisorId: student.supervisorId || this.currentUser?.uid || "staff",
           updatedAt: this.fb.serverTimestamp()
         }, { merge: true });
       }
@@ -310,14 +315,14 @@ class SyncManager {
   }
 
   async syncAttendance(date, studentId, status) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       const docId = `${date}_${studentId}`;
       await this.fb.setDoc(this.fb.doc(this.fb.db, "attendance", docId), {
         date,
         studentId,
         status,
-        supervisorId: this.currentUser.uid,
+        supervisorId: this.currentUser?.uid || "staff",
         updatedAt: this.fb.serverTimestamp()
       }, { merge: true });
     } catch (e) {
@@ -326,11 +331,11 @@ class SyncManager {
   }
 
   async syncViolation(violation, isResolve = false) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       await this.fb.setDoc(this.fb.doc(this.fb.db, "violations", violation.id), {
         ...violation,
-        supervisorId: violation.supervisorId || this.currentUser.uid,
+        supervisorId: violation.supervisorId || this.currentUser?.uid || "staff",
         status: isResolve ? "resolved" : (violation.status || "pending"),
         updatedAt: this.fb.serverTimestamp()
       }, { merge: true });
@@ -340,7 +345,7 @@ class SyncManager {
   }
 
   async deleteViolation(id) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       await this.fb.deleteDoc(this.fb.doc(this.fb.db, "violations", id));
     } catch (e) {
@@ -349,12 +354,12 @@ class SyncManager {
   }
 
   async syncCleanliness(item) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       const docKey = item.date ? `${item.date}_room_${item.room}` : `room_${item.room}`;
       await this.fb.setDoc(this.fb.doc(this.fb.db, "cleanliness_inspections", docKey), {
         ...item,
-        supervisorId: this.currentUser.uid,
+        supervisorId: this.currentUser?.uid || "staff",
         updatedAt: this.fb.serverTimestamp()
       }, { merge: true });
     } catch (e) {
@@ -363,7 +368,7 @@ class SyncManager {
   }
 
   async syncRoom(room, isDelete = false) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       const ref = this.fb.doc(this.fb.db, "rooms", String(room.id));
       if (isDelete) {
@@ -380,7 +385,7 @@ class SyncManager {
   }
 
   async syncRoster(roster) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       await this.fb.setDoc(this.fb.doc(this.fb.db, "settings", "roster"), {
         items: roster,
@@ -392,7 +397,7 @@ class SyncManager {
   }
 
   async syncActivity(item, isDelete = false) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       const ref = this.fb.doc(this.fb.db, "activities", item.id);
       if (isDelete) {
@@ -409,7 +414,7 @@ class SyncManager {
   }
 
   async syncMeta(metaUpdates) {
-    if (!this.fb || !this.currentUser) return;
+    if (!this.fb) return;
     try {
       await this.fb.setDoc(this.fb.doc(this.fb.db, "app_settings", "dormitory_meta"), {
         ...metaUpdates,

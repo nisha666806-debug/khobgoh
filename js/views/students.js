@@ -108,7 +108,6 @@ export function renderStudents() {
                       <div>
                         <div style="font-weight:700; font-size:14px; display:flex; align-items:center; gap:6px;">
                           <span>${name}</span>
-                          ${isLeader ? `<span title="Сардори ҳуҷра 👑" style="font-size:13px; cursor:help;">👑</span>` : ''}
                         </div>
                         <div style="font-size:11px; color:var(--text-faint); font-family:var(--font-mono);">${studentId}</div>
                       </div>
