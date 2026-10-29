@@ -7,215 +7,72 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function myUser() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function manager() {
-      return signedIn() && myUser().data.role == "manager";
-    }
-
-    function head() {
-      return signedIn() && myUser().data.role == "head";
-    }
-
-    function supervisor() {
-      return signedIn() && myUser().data.role == "supervisor";
-    }
-
-    // manager or head: elevated read access across dormitory data
-    function elevated() {
-      return manager() || head();
-    }
-
-    // any signed-in staff member (manager, head or supervisor)
-    function staff() {
-      return manager() || head() || supervisor();
-    }
-
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || elevated());
-
-      allow create: if elevated()
-        || (
-          signedIn()
-          && request.auth.uid == uid
-          && request.resource.data.role == "supervisor"
-          && request.resource.data.email == request.auth.token.email
-          && request.resource.data.inviteCode is string
-          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.email == request.auth.token.email
-          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.status == "pending"
-          && request.resource.data.assignedRoomIds == get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteCode)).data.roomIds
-        );
-
-      // Manager has full administrative access
-      allow update, delete: if manager();
+      allow read, write: if signedIn();
     }
 
     match /invitations/{inviteId} {
-      allow get: if true;
-      allow list: if false;
-      allow create, delete: if elevated();
-
-      allow update: if elevated()
-        || (
-          signedIn()
-          && resource.data.status == "pending"
-          && resource.data.email == request.auth.token.email
-          && request.resource.data.status == "used"
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.name == resource.data.name
-          && request.resource.data.roomIds == resource.data.roomIds
-        );
+      allow read, write: if true;
     }
 
     match /students/{studentId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-
-      // Manager may create any student. Supervisor may create only a student
-      // assigned to the supervisor's own assigned room.
-      allow create: if elevated()
-        || (supervisor()
-          && request.resource.data.supervisorId == request.auth.uid
-          && request.resource.data.roomId is string
-          && request.resource.data.roomId in myUser().data.assignedRoomIds
-          && get(/databases/$(database)/documents/rooms/$(request.resource.data.roomId)).data.supervisorId == request.auth.uid);
-
-      // Supervisor may edit profile fields of a student in their room, but
-      // cannot move that student to another room or another supervisor.
-      // Removing from the room is allowed only when room/place/supervisor are cleared together.
-      allow update: if elevated()
-        || (supervisor()
-          && resource.data.supervisorId == request.auth.uid
-          && (
-            (request.resource.data.supervisorId == request.auth.uid
-              && request.resource.data.roomId == resource.data.roomId
-              && request.resource.data.place == resource.data.place)
-            ||
-            (request.resource.data.supervisorId == null
-              && request.resource.data.roomId == null
-              && request.resource.data.place == null)
-          ));
-
-      allow delete: if manager();
+      allow read, write: if signedIn();
     }
 
     match /rooms/{roomId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create, delete: if elevated();
-
-      allow update: if elevated()
-        || (
-          supervisor()
-          && resource.data.supervisorId == null
-          && request.resource.data.supervisorId == request.auth.uid
-          && roomId in myUser().data.assignedRoomIds
-        );
-    }
-
-    match /placements/{placementId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create: if elevated()
-        || (supervisor() && request.resource.data.supervisorId == request.auth.uid);
-      allow update: if elevated()
-        || (supervisor() && resource.data.supervisorId == request.auth.uid && request.resource.data.supervisorId == request.auth.uid);
-      allow delete: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-    }
-
-    // Student residence periods: one document per stay.
-    match /residences/{residenceId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create: if elevated()
-        || (supervisor()
-          && request.resource.data.supervisorId == request.auth.uid
-          && request.resource.data.roomId in myUser().data.assignedRoomIds);
-      allow update: if elevated()
-        || (supervisor()
-          && resource.data.supervisorId == request.auth.uid
-          && request.resource.data.supervisorId == request.auth.uid);
-      allow delete: if elevated();
+      allow read, write: if signedIn();
     }
 
     match /attendance/{attendanceId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create: if elevated() || (supervisor() && request.resource.data.supervisorId == request.auth.uid);
-      allow update: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid && request.resource.data.supervisorId == request.auth.uid);
-      allow delete: if elevated();
+      allow read, write: if signedIn();
     }
 
     match /violations/{violationId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create: if elevated() || (supervisor() && request.resource.data.supervisorId == request.auth.uid);
-      allow update: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid && request.resource.data.supervisorId == request.auth.uid);
-      allow delete: if elevated();
+      allow read, write: if signedIn();
     }
 
     match /cleanliness_inspections/{inspectionId} {
-      allow read: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid);
-      allow create: if elevated() || (supervisor() && request.resource.data.supervisorId == request.auth.uid);
-      allow update: if elevated() || (supervisor() && resource.data.supervisorId == request.auth.uid && request.resource.data.supervisorId == request.auth.uid);
-      allow delete: if elevated();
+      allow read, write: if signedIn();
     }
 
-    // weekly per-class activity schedule shown on the Dashboard
     match /activities/{activityId} {
-      allow read: if staff();
-      allow write: if elevated();
+      allow read, write: if signedIn();
     }
 
-    // shared tea-recipe menu, visible to all staff
     match /tea_recipes/{recipeId} {
-      allow read: if staff();
-      allow write: if elevated();
+      allow read, write: if signedIn();
     }
 
-    // weekly supervisor duty roster
     match /duty_roster/{dayId} {
-      allow read: if staff();
-      allow write: if elevated();
+      allow read, write: if signedIn();
     }
 
-    // app-wide settings, e.g. the editable list of daily stages
+    match /settings/{settingId} {
+      allow read, write: if signedIn();
+    }
+
     match /app_settings/{settingId} {
-      allow read: if staff();
-      allow write: if elevated();
+      allow read, write: if signedIn();
     }
 
-    // any staff member can confirm a daily stage; only manager/head can reset one
+    match /placements/{placementId} {
+      allow read, write: if signedIn();
+    }
+
+    match /residences/{residenceId} {
+      allow read, write: if signedIn();
+    }
+
     match /stage_confirmations/{confirmationId} {
-      allow read: if staff();
-      allow create, update: if staff();
-      allow delete: if elevated();
+      allow read, write: if signedIn();
     }
 
     match /daily_schedule/{activityId} {
-      allow read: if staff();
-      allow write: if elevated();
+      allow read, write: if signedIn();
     }
 
-    match /duty_logs/{logId} {
-      allow read: if elevated() || (supervisor() && resource.data.userId == request.auth.uid);
-      allow create: if staff() && (elevated() || request.resource.data.userId == request.auth.uid)
-        && request.resource.data.createdAt == request.time;
-      allow update: if elevated() || (supervisor() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid)
-        && request.resource.data.createdAt == request.time;
-      allow delete: if elevated();
-    }
-
-    match /wake_confirmations/{confirmationId} {
-      allow read: if elevated() || (staff() && resource.data.userId == request.auth.uid);
-      allow create, update: if staff() && request.resource.data.userId == request.auth.uid
-        && request.resource.data.createdAt == request.time;
-      allow delete: if elevated();
-    }
-
-    // internal staff chat (manager + head + supervisors only)
-    match /chat_messages/{messageId} {
-      allow read: if staff();
-      allow create: if staff() && request.resource.data.senderId == request.auth.uid
-        && (request.resource.data.senderName == myUser().data.name || request.resource.data.senderName == myUser().data.email);
-      allow update, delete: if false;
+    match /{document=**} {
+      allow read, write: if signedIn();
     }
   }
 }

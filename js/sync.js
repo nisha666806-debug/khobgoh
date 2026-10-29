@@ -110,27 +110,27 @@ class SyncManager {
     this.unsubscribeCollections();
 
     const db = this.fb.db;
-    const elevated = this.isElevated();
     const uid = this.currentUser.uid;
 
-    // 1. Students collection listener
+    // 1. Students collection listener (Full shared sync across all devices)
     try {
-      const q = elevated
-        ? this.fb.collection(db, "students")
-        : this.fb.query(this.fb.collection(db, "students"), this.fb.where("supervisorId", "==", uid));
-
-      const unsub = this.fb.onSnapshot(q, (snap) => {
+      const q = this.fb.collection(db, "students");
+      const unsub = this.fb.onSnapshot(q, async (snap) => {
         if (!snap.empty) {
           const remoteList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          if (elevated) {
-            this.store.state.students = remoteList;
-          } else {
-            // Merge with local state so supervisor sees their own plus cached
-            const map = new Map(this.store.state.students.map(s => [s.id, s]));
-            remoteList.forEach(s => map.set(s.id, s));
-            this.store.state.students = [...map.values()];
-          }
+          this.store.state.students = remoteList;
           this.store.saveState();
+        } else if (this.store.state.students?.length > 0) {
+          // If remote is empty, seed initial students so all devices have shared data
+          try {
+            const batch = this.fb.writeBatch(db);
+            this.store.state.students.forEach(s => {
+              batch.set(this.fb.doc(db, "students", s.id), { ...s, updatedAt: this.fb.serverTimestamp() }, { merge: true });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.debug("Seed students info:", e);
+          }
         }
       }, err => console.debug("Students snapshot info:", err));
       this.unsubscribers.push(unsub);
@@ -138,12 +138,9 @@ class SyncManager {
       console.debug("Students listener init error:", e);
     }
 
-    // 2. Attendance collection listener
+    // 2. Attendance collection listener (Shared across all staff)
     try {
-      const q = elevated
-        ? this.fb.collection(db, "attendance")
-        : this.fb.query(this.fb.collection(db, "attendance"), this.fb.where("supervisorId", "==", uid));
-
+      const q = this.fb.collection(db, "attendance");
       const unsub = this.fb.onSnapshot(q, (snap) => {
         if (!snap.empty) {
           snap.docs.forEach(d => {
@@ -169,12 +166,9 @@ class SyncManager {
       console.debug("Attendance listener init error:", e);
     }
 
-    // 3. Violations collection listener
+    // 3. Violations collection listener (Shared across all staff)
     try {
-      const q = elevated
-        ? this.fb.collection(db, "violations")
-        : this.fb.query(this.fb.collection(db, "violations"), this.fb.where("supervisorId", "==", uid));
-
+      const q = this.fb.collection(db, "violations");
       const unsub = this.fb.onSnapshot(q, (snap) => {
         if (!snap.empty) {
           const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -187,7 +181,7 @@ class SyncManager {
       console.debug("Violations listener init error:", e);
     }
 
-    // 4. Cleanliness Inspections listener
+    // 4. Cleanliness Inspections listener (Shared)
     try {
       const unsub = this.fb.onSnapshot(this.fb.collection(db, "cleanliness_inspections"), (snap) => {
         if (!snap.empty) {
@@ -201,7 +195,48 @@ class SyncManager {
       console.debug("Cleanliness listener init error:", e);
     }
 
-    // 5. Activities Matrix listener
+    // 5. Rooms collection listener (Shared room directory)
+    try {
+      const unsub = this.fb.onSnapshot(this.fb.collection(db, "rooms"), async (snap) => {
+        if (!snap.empty) {
+          const roomList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          this.store.state.rooms = roomList;
+          this.store.saveState();
+        } else if (this.store.state.rooms?.length > 0) {
+          // If remote rooms empty, seed current rooms
+          try {
+            const batch = this.fb.writeBatch(db);
+            this.store.state.rooms.forEach(r => {
+              batch.set(this.fb.doc(db, "rooms", String(r.id)), { ...r, updatedAt: this.fb.serverTimestamp() }, { merge: true });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.debug("Seed rooms info:", e);
+          }
+        }
+      }, err => console.debug("Rooms snapshot info:", err));
+      this.unsubscribers.push(unsub);
+    } catch (e) {
+      console.debug("Rooms listener init error:", e);
+    }
+
+    // 6. Duty Roster listener (Shared weekly roster)
+    try {
+      const unsub = this.fb.onSnapshot(this.fb.doc(db, "settings", "roster"), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data && Array.isArray(data.items)) {
+            this.store.state.roster = data.items;
+            this.store.saveState();
+          }
+        }
+      }, err => console.debug("Roster snapshot info:", err));
+      this.unsubscribers.push(unsub);
+    } catch (e) {
+      console.debug("Roster listener init error:", e);
+    }
+
+    // 7. Activities Matrix listener
     try {
       const unsub = this.fb.onSnapshot(this.fb.collection(db, "activities"), (snap) => {
         if (!snap.empty) {
@@ -214,7 +249,7 @@ class SyncManager {
       console.debug("Activities listener init error:", e);
     }
 
-    // 6. Metadata (Tea, Room leaders, Inspector)
+    // 8. Metadata (Tea recipes, Room leaders, Cleanliness Inspector)
     try {
       const unsub = this.fb.onSnapshot(this.fb.doc(db, "app_settings", "dormitory_meta"), (snap) => {
         if (snap.exists()) {
@@ -230,20 +265,21 @@ class SyncManager {
       console.debug("Meta listener init error:", e);
     }
 
-    // 7. Supervisors list (for elevated users)
-    if (elevated) {
-      try {
-        const q = this.fb.query(this.fb.collection(db, "users"), this.fb.where("role", "in", ["supervisor", "head"]));
-        const unsub = this.fb.onSnapshot(q, (snap) => {
-          if (!snap.empty) {
-            this.store.state.supervisors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 9. Supervisors list (Shared staff list)
+    try {
+      const q = this.fb.query(this.fb.collection(db, "users"));
+      const unsub = this.fb.onSnapshot(q, (snap) => {
+        if (!snap.empty) {
+          const sups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (sups.length > 0) {
+            this.store.state.supervisors = sups;
             this.store.saveState();
           }
-        }, err => console.debug("Supervisors snapshot info:", err));
-        this.unsubscribers.push(unsub);
-      } catch (e) {
-        console.debug("Supervisors listener init error:", e);
-      }
+        }
+      }, err => console.debug("Supervisors snapshot info:", err));
+      this.unsubscribers.push(unsub);
+    } catch (e) {
+      console.debug("Supervisors listener init error:", e);
     }
   }
 
@@ -315,13 +351,31 @@ class SyncManager {
   async syncCleanliness(item) {
     if (!this.fb || !this.currentUser) return;
     try {
-      await this.fb.setDoc(this.fb.doc(this.fb.db, "cleanliness_inspections", `room_${item.room}`), {
+      const docKey = item.date ? `${item.date}_room_${item.room}` : `room_${item.room}`;
+      await this.fb.setDoc(this.fb.doc(this.fb.db, "cleanliness_inspections", docKey), {
         ...item,
         supervisorId: this.currentUser.uid,
         updatedAt: this.fb.serverTimestamp()
       }, { merge: true });
     } catch (e) {
       console.warn("syncCleanliness cloud write:", e);
+    }
+  }
+
+  async syncRoom(room, isDelete = false) {
+    if (!this.fb || !this.currentUser) return;
+    try {
+      const ref = this.fb.doc(this.fb.db, "rooms", String(room.id));
+      if (isDelete) {
+        await this.fb.deleteDoc(ref);
+      } else {
+        await this.fb.setDoc(ref, {
+          ...room,
+          updatedAt: this.fb.serverTimestamp()
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("syncRoom cloud write:", e);
     }
   }
 

@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v3_4";
+const STORAGE_KEY = "khobgoh_state_v3_5";
 
 class Store {
   constructor() {
@@ -233,15 +233,18 @@ class Store {
       existing.floor = Number(floor);
       existing.type = type;
       if (supervisorId) existing.supervisorId = supervisorId;
+      syncManager.syncRoom(existing);
     } else {
-      this.state.rooms.push({
+      const newRoom = {
         id: roomId,
         name: roomName,
         floor: Number(floor) || (parseInt(roomId[0]) || 1),
         type,
         capacity: Number(capacity),
         supervisorId: supervisorId || ""
-      });
+      };
+      this.state.rooms.push(newRoom);
+      syncManager.syncRoom(newRoom);
     }
     this.saveState();
   }
@@ -256,6 +259,7 @@ class Store {
 
     const newId = updates.id ? String(updates.id).trim() : oldId;
     if (newId !== oldId) {
+      syncManager.syncRoom({ id: oldId }, true);
       this.state.students.forEach(s => {
         if (s.room === oldId) s.room = newId;
       });
@@ -273,6 +277,7 @@ class Store {
     if (updates.supervisorId !== undefined) target.supervisorId = updates.supervisorId;
 
     this.saveState();
+    syncManager.syncRoom(target);
   }
 
   deleteRoom(roomId) {
@@ -282,6 +287,7 @@ class Store {
     this.state.rooms = this.state.rooms.filter(r => r.id !== roomId);
     delete this.state.roomLeaders[roomId];
     this.saveState();
+    syncManager.syncRoom({ id: roomId }, true);
   }
 
   setRoomSupervisor(roomId, supervisorId) {
