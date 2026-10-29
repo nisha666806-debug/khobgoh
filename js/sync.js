@@ -117,25 +117,12 @@ class SyncManager {
     // 1. Students collection listener (Full shared sync across all devices)
     try {
       const q = this.fb.collection(db, "students");
-      const unsub = this.fb.onSnapshot(q, async (snap) => {
-        if (!snap.empty) {
-          const remoteList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          this.store.state.students = remoteList;
-          this.store.saveState();
-          if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
-            window.khobgoh.renderApp();
-          }
-        } else if (this.store.state.students?.length > 0) {
-          // If remote is empty, seed initial students so all devices have shared data
-          try {
-            const batch = this.fb.writeBatch(db);
-            this.store.state.students.forEach(s => {
-              batch.set(this.fb.doc(db, "students", s.id), { ...s, updatedAt: this.fb.serverTimestamp() }, { merge: true });
-            });
-            await batch.commit();
-          } catch (e) {
-            console.debug("Seed students info:", e);
-          }
+      const unsub = this.fb.onSnapshot(q, (snap) => {
+        const remoteList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        this.store.state.students = remoteList;
+        this.store.saveState();
+        if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
+          window.khobgoh.renderApp();
         }
       }, err => console.debug("Students snapshot info:", err));
       this.unsubscribers.push(unsub);
@@ -175,10 +162,11 @@ class SyncManager {
     try {
       const q = this.fb.collection(db, "violations");
       const unsub = this.fb.onSnapshot(q, (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          this.store.state.violations = list;
-          this.store.saveState();
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        this.store.state.violations = list;
+        this.store.saveState();
+        if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
+          window.khobgoh.renderApp();
         }
       }, err => console.debug("Violations snapshot info:", err));
       this.unsubscribers.push(unsub);
@@ -189,10 +177,11 @@ class SyncManager {
     // 4. Cleanliness Inspections listener (Shared)
     try {
       const unsub = this.fb.onSnapshot(this.fb.collection(db, "cleanliness_inspections"), (snap) => {
-        if (!snap.empty) {
-          const cleanData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          this.store.state.cleanliness = cleanData.sort((a, b) => b.score - a.score);
-          this.store.saveState();
+        const cleanData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        this.store.state.cleanliness = cleanData.sort((a, b) => b.score - a.score);
+        this.store.saveState();
+        if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
+          window.khobgoh.renderApp();
         }
       }, err => console.debug("Cleanliness snapshot info:", err));
       this.unsubscribers.push(unsub);
@@ -202,21 +191,13 @@ class SyncManager {
 
     // 5. Rooms collection listener (Shared room directory)
     try {
-      const unsub = this.fb.onSnapshot(this.fb.collection(db, "rooms"), async (snap) => {
+      const unsub = this.fb.onSnapshot(this.fb.collection(db, "rooms"), (snap) => {
         if (!snap.empty) {
           const roomList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           this.store.state.rooms = roomList;
           this.store.saveState();
-        } else if (this.store.state.rooms?.length > 0) {
-          // If remote rooms empty, seed current rooms
-          try {
-            const batch = this.fb.writeBatch(db);
-            this.store.state.rooms.forEach(r => {
-              batch.set(this.fb.doc(db, "rooms", String(r.id)), { ...r, updatedAt: this.fb.serverTimestamp() }, { merge: true });
-            });
-            await batch.commit();
-          } catch (e) {
-            console.debug("Seed rooms info:", e);
+          if (typeof window !== "undefined" && window.khobgoh?.renderApp) {
+            window.khobgoh.renderApp();
           }
         }
       }, err => console.debug("Rooms snapshot info:", err));

@@ -1,17 +1,17 @@
-// Khobgoh Main Application Controller v2.2
-import { store } from "./store.js";
-import { syncManager } from "./sync.js";
-import { renderDashboard } from "./views/dashboard.js";
-import { renderStudents } from "./views/students.js";
-import { renderRooms } from "./views/rooms.js";
-import { renderAttendance } from "./views/attendance.js";
-import { renderActivities } from "./views/activities.js";
-import { renderViolations } from "./views/violations.js";
-import { renderCleanliness } from "./views/cleanliness.js";
-import { renderRoster } from "./views/roster.js";
-import { renderSupervisors } from "./views/supervisors.js";
-import { renderTea } from "./views/tea.js";
-import { renderSettings } from "./views/settings.js";
+// Khobgoh Main Application Controller v3.7
+import { store } from "./store.js?v=3.7";
+import { syncManager } from "./sync.js?v=3.7";
+import { renderDashboard } from "./views/dashboard.js?v=3.7";
+import { renderStudents } from "./views/students.js?v=3.7";
+import { renderRooms } from "./views/rooms.js?v=3.7";
+import { renderAttendance } from "./views/attendance.js?v=3.7";
+import { renderActivities } from "./views/activities.js?v=3.7";
+import { renderViolations } from "./views/violations.js?v=3.7";
+import { renderCleanliness } from "./views/cleanliness.js?v=3.7";
+import { renderRoster } from "./views/roster.js?v=3.7";
+import { renderSupervisors } from "./views/supervisors.js?v=3.7";
+import { renderTea } from "./views/tea.js?v=3.7";
+import { renderSettings } from "./views/settings.js?v=3.7";
 
 // Toast notifications
 export function showToast(message, type = "success") {

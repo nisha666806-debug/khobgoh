@@ -1,9 +1,9 @@
-// Khobgoh Central State Store with LocalStorage persistence v2.2
-import { initialData } from "./data.js";
-import { translations } from "./translations.js";
-import { syncManager } from "./sync.js";
+// Khobgoh Central State Store with LocalStorage persistence v3.7
+import { initialData } from "./data.js?v=3.7";
+import { translations } from "./translations.js?v=3.7";
+import { syncManager } from "./sync.js?v=3.7";
 
-const STORAGE_KEY = "khobgoh_state_v3_6";
+const STORAGE_KEY = "khobgoh_state_v3_7";
 
 class Store {
   constructor() {
@@ -14,7 +14,7 @@ class Store {
   loadState() {
     try {
       if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("khobgoh_state_v3_5");
+        const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("khobgoh_state_v3_6") || localStorage.getItem("khobgoh_state_v3_5");
         if (saved) {
           const parsed = JSON.parse(saved);
           return {
