@@ -187,17 +187,7 @@ function renderApp() {
             </div>
           </div>
 
-          <!-- Quick Tea Access across ALL pages -->
           <div style="display:flex; align-items:center; gap:8px;">
-            <button 
-              class="btn btn-secondary btn-sm" 
-              onclick="window.khobgoh.navigate('tea')" 
-              style="display:flex; align-items:center; gap:6px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.35); color:var(--emerald-800); font-weight:700;"
-              title="Ҷадвали чойнӯшии синфҳо ва рецептҳо">
-              <span>🍵</span>
-              <span>Чойнӯшӣ</span>
-            </button>
-
             <!-- Real-time Cloud Sync & Auth Button -->
             ${syncManager.currentUser ? `
               <button 
@@ -331,6 +321,10 @@ window.khobgoh = {
   },
 
   changeRole(role) {
+    if (store.state.activeRole !== "manager" && store.state.activeRole !== "head") {
+      showToast("Ивази худсаронаи вазифа маҳдуд аст.", "error");
+      return;
+    }
     store.setRole(role);
     showToast(`Нақш ба «${role}» иваз шуд!`, "info");
   },
@@ -508,6 +502,84 @@ window.khobgoh = {
     closeModal();
     const student = store.state.students.find(s => s.id === studentId);
     showToast(`${student?.name} сардори Ҳуҷраи ${roomId} таъин шуд!`, "success");
+  },
+
+  // Duty Roster Handler (2-3 supervisors appointed by Head Supervisor - Requirement 6)
+  openEditDutyRosterModal(dayKey) {
+    if (!store.canManageRooms()) {
+      showToast("Танҳо Сармураббӣ ва Мудир метавонанд навбатдоронро таъин кунанд.", "error");
+      return;
+    }
+
+    const dayItem = (store.state.roster || []).find(r => r.day === dayKey) || { label: dayKey, supervisors: [] };
+    const currentSups = dayItem.supervisors || [];
+    const supervisors = store.state.supervisors || [];
+
+    const sup1Id = currentSups[0]?.id || "";
+    const sup2Id = currentSups[1]?.id || "";
+    const sup3Id = currentSups[2]?.id || "";
+
+    const body = `
+      <div style="margin-bottom:14px; font-size:13px; color:var(--text-muted);">
+        Барои рӯзи <b>${dayItem.label}</b> то 3 нафар мураббии навбатдорро интихоб намоед:
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">1. Навбатдори асосӣ (1) *</label>
+        <select id="rosterSup1" class="form-control">
+          <option value="">-- Интихоб кунед --</option>
+          ${supervisors.map(s => `
+            <option value="${s.id}" ${sup1Id === s.id ? 'selected' : ''}>
+              ${s.name} (${s.role === 'head' ? '👑 Сармураббӣ' : 'Мураббӣ'}, ${s.phone || ''})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">2. Навбатдори дуюм (2) (ихтиёрӣ)</label>
+        <select id="rosterSup2" class="form-control">
+          <option value="">-- Бе навбатдори дуюм --</option>
+          ${supervisors.map(s => `
+            <option value="${s.id}" ${sup2Id === s.id ? 'selected' : ''}>
+              ${s.name} (${s.role === 'head' ? '👑 Сармураббӣ' : 'Мураббӣ'}, ${s.phone || ''})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">3. Навбатдори сеюм (3) (ихтиёрӣ)</label>
+        <select id="rosterSup3" class="form-control">
+          <option value="">-- Бе навбатдори сеюм --</option>
+          ${supervisors.map(s => `
+            <option value="${s.id}" ${sup3Id === s.id ? 'selected' : ''}>
+              ${s.name} (${s.role === 'head' ? '👑 Сармураббӣ' : 'Мураббӣ'}, ${s.phone || ''})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    `;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.khobgoh.closeModal()">Бекор кардан</button>
+      <button class="btn btn-primary" onclick="window.khobgoh.submitDutyRoster('${dayKey}')">Сабт кардан</button>
+    `;
+
+    openModal(`Танзими навбатдорони рӯзи ${dayItem.label}`, body, footer);
+  },
+
+  submitDutyRoster(dayKey) {
+    const s1 = document.getElementById("rosterSup1")?.value;
+    const s2 = document.getElementById("rosterSup2")?.value;
+    const s3 = document.getElementById("rosterSup3")?.value;
+
+    const ids = [s1, s2, s3].filter(Boolean);
+    const uniqueIds = [...new Set(ids)];
+
+    store.setDayRoster(dayKey, uniqueIds);
+    closeModal();
+    showToast(`Навбатдорони рӯзи сабтшуда бо муваффақият таъин шуданд!`, "success");
   },
 
   // Supervisor CRUD Modals
@@ -1696,7 +1768,21 @@ window.khobgoh = {
     showToast("Қоидавайронкунӣ ҳал карда шуд!", "success");
   },
 
-  // Cleanliness 5 Criteria Scoring (Requirements 10 & 11)
+  deleteViolation(id) {
+    if (confirm("Оё мутмаин ҳастед, ки ин сабти қоидавайронкуниро нест кардан мехоҳед?")) {
+      store.deleteViolation(id);
+      showToast("Сабти қоидавайронкунӣ нест карда шуд!", "info");
+    }
+  },
+
+  // Cleanliness 5 Criteria Scoring (Requirements 4 & 5)
+  selectedCleanlinessDate: new Date().toISOString().split("T")[0],
+
+  changeCleanlinessDate(date) {
+    window.khobgoh.selectedCleanlinessDate = date;
+    store.notify();
+  },
+
   openRateRoomModal() {
     if (!store.canRateCleanliness()) {
       showToast("Танҳо мураббии масъули тозагӣ ва Мудир метавонанд баҳо гузоранд.", "error");
@@ -1704,12 +1790,20 @@ window.khobgoh = {
     }
 
     const rooms = store.state.rooms.filter(r => r.type === 'student');
+    const defaultDate = window.khobgoh.selectedCleanlinessDate || new Date().toISOString().split("T")[0];
+
     const body = `
-      <div class="form-group">
-        <label class="form-label">Интихоби ҳуҷра</label>
-        <select id="rateRoomSelect" class="form-control">
-          ${rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-        </select>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Интихоби ҳуҷра *</label>
+          <select id="rateRoomSelect" class="form-control">
+            ${rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Санаи санҷиш *</label>
+          <input type="date" id="rateRoomDate" class="form-control" value="${defaultDate}">
+        </div>
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
@@ -1750,11 +1844,12 @@ window.khobgoh = {
       <button class="btn btn-primary" onclick="window.khobgoh.submitRateRoom5()">Сабти холҳо (50)</button>
     `;
 
-    openModal("Баҳогузории озмуни тозагӣ (5 меъёр)", body, footer);
+    openModal("Баҳогузории озмуни тозагӣ (Масъули тозагӣ)", body, footer);
   },
 
   submitRateRoom5() {
     const room = document.getElementById("rateRoomSelect")?.value;
+    const date = document.getElementById("rateRoomDate")?.value;
     const appearance = document.getElementById("rateAppearance")?.value;
     const wardrobes = document.getElementById("rateWardrobes")?.value;
     const beds = document.getElementById("rateBeds")?.value;
@@ -1764,9 +1859,9 @@ window.khobgoh = {
 
     if (!room) return;
 
-    store.rateRoom5(room, appearance, wardrobes, beds, dust, air, notes);
+    store.rateRoom5(room, appearance, wardrobes, beds, dust, air, notes, date);
     closeModal();
-    showToast(`Баҳогузории Ҳуҷраи ${room} бо муваффақият сабт шуд!`, "success");
+    showToast(`Баҳогузории Ҳуҷраи ${room} барои санаи ${date || 'имрӯз'} сабт шуд!`, "success");
   },
 
   // Quick Tea Access across ALL pages

@@ -136,23 +136,28 @@ export const initialData = {
   ],
 
   cleanliness: [
-    { room: "101", score: 48, appearance: 15, wardrobes: 10, beds: 10, dust: 9, air: 4, rank: 1, notes: "Намунавӣ ва хеле тоза" },
-    { room: "104", score: 46, appearance: 14, wardrobes: 9, beds: 10, dust: 9, air: 4, rank: 2, notes: "Тартиботи аъло" },
-    { room: "102", score: 44, appearance: 13, wardrobes: 9, beds: 9, dust: 9, air: 4, rank: 3, notes: "Тозагии хуб" },
-    { room: "106", score: 41, appearance: 12, wardrobes: 8, beds: 9, dust: 8, air: 4, rank: 4, notes: "Чанд либос дар рӯи кат буд" },
-    { room: "103", score: 39, appearance: 11, wardrobes: 8, beds: 8, dust: 8, air: 4, rank: 5, notes: "Тирезаҳо кушода шаванд" },
-    { room: "105", score: 37, appearance: 10, wardrobes: 7, beds: 8, dust: 8, air: 4, rank: 6, notes: "Китобҳо дар ҷояш гузошта шавад" },
-    { room: "107", score: 35, appearance: 10, wardrobes: 7, beds: 7, dust: 7, air: 4, rank: 7, notes: "Фарш тоза карда шавад" }
+    { id: "cl_101", room: "101", date: "2026-10-29", score: 48, appearance: 15, wardrobes: 10, beds: 10, dust: 9, air: 4, rank: 1, inspectorName: "Ҳасанов Фарҳод", notes: "Намунавӣ ва хеле тоза" },
+    { id: "cl_104", room: "104", date: "2026-10-29", score: 46, appearance: 14, wardrobes: 9, beds: 10, dust: 9, air: 4, rank: 2, inspectorName: "Ҳасанов Фарҳод", notes: "Тартиботи аъло" },
+    { id: "cl_102", room: "102", date: "2026-10-29", score: 44, appearance: 13, wardrobes: 9, beds: 9, dust: 9, air: 4, rank: 3, inspectorName: "Ҳасанов Фарҳод", notes: "Тозагии хуб" },
+    { id: "cl_106", room: "106", date: "2026-10-29", score: 41, appearance: 12, wardrobes: 8, beds: 9, dust: 8, air: 4, rank: 4, inspectorName: "Ҳасанов Фарҳод", notes: "Чанд либос дар рӯи кат буд" },
+    { id: "cl_103", room: "103", date: "2026-10-29", score: 39, appearance: 11, wardrobes: 8, beds: 8, dust: 8, air: 4, rank: 5, inspectorName: "Ҳасанов Фарҳод", notes: "Тирезаҳо кушода шаванд" },
+    { id: "cl_105", room: "105", date: "2026-10-29", score: 37, appearance: 10, wardrobes: 7, beds: 8, dust: 8, air: 4, rank: 6, inspectorName: "Ҳасанов Фарҳод", notes: "Китобҳо дар ҷояш гузошта шавад" },
+    { id: "cl_107", room: "107", date: "2026-10-29", score: 35, appearance: 10, wardrobes: 7, beds: 7, dust: 7, air: 4, rank: 7, inspectorName: "Ҳасанов Фарҳод", notes: "Фарш тоза карда шавад" },
+    // Дирӯз (History)
+    { id: "cl_101_prev", room: "101", date: "2026-10-28", score: 47, appearance: 14, wardrobes: 10, beds: 10, dust: 9, air: 4, rank: 1, inspectorName: "Ҳасанов Фарҳод", notes: "Ҳама ҷо тоза" },
+    { id: "cl_104_prev", room: "104", date: "2026-10-28", score: 45, appearance: 13, wardrobes: 9, beds: 10, dust: 9, air: 4, rank: 2, inspectorName: "Ҳасанов Фарҳод", notes: "Хуб" },
+    { id: "cl_102_prev", room: "102", date: "2026-10-28", score: 42, appearance: 12, wardrobes: 9, beds: 9, dust: 8, air: 4, rank: 3, inspectorName: "Ҳасанов Фарҳод", notes: "Миёна" }
   ],
 
+  // Duty Roster (2-3 supervisors appointed per day by Head Supervisor - Requirement 6)
   roster: [
-    { day: "mon", label: "Душанбе", supervisorId: "sup_1", supervisorName: "Сарвар Усмонов", phone: "+992 900 11 22 33", active: false },
-    { day: "tue", label: "Сешанбе", supervisorId: "sup_2", supervisorName: "Бахтиёр Шарипов", phone: "+992 918 44 55 66", active: true },
-    { day: "wed", label: "Чоршанбе", supervisorId: "sup_3", supervisorName: "Нигина Холова", phone: "+992 927 77 88 99", active: false },
-    { day: "thu", label: "Панҷшанбе", supervisorId: "sup_4", supervisorName: "Давлат Ҷабборов", phone: "+992 935 00 11 22", active: false },
-    { day: "fri", label: "Ҷумъа", supervisorId: "sup_1", supervisorName: "Сарвар Усмонов", phone: "+992 900 11 22 33", active: false },
-    { day: "sat", label: "Шанбе", supervisorId: "sup_2", supervisorName: "Бахтиёр Шарипов", phone: "+992 918 44 55 66", active: false },
-    { day: "sun", label: "Якшанбе", supervisorId: "sup_3", supervisorName: "Нигина Холова", phone: "+992 927 77 88 99", active: false }
+    { day: "mon", label: "Душанбе", supervisors: [], active: false },
+    { day: "tue", label: "Сешанбе", supervisors: [], active: false },
+    { day: "wed", label: "Чоршанбе", supervisors: [], active: false },
+    { day: "thu", label: "Панҷшанбе", supervisors: [], active: false },
+    { day: "fri", label: "Ҷумъа", supervisors: [], active: false },
+    { day: "sat", label: "Шанбе", supervisors: [], active: false },
+    { day: "sun", label: "Якшанбе", supervisors: [], active: false }
   ],
 
   // Redesigned Tea & Kitchen state (Requirements 7 & 8)

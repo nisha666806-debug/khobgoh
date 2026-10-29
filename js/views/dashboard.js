@@ -4,7 +4,12 @@ import { store } from "../store.js";
 export function renderDashboard() {
   const stats = store.getStats();
   const t = (k) => store.t(k);
-  const todayRoster = store.state.roster.find(r => r.active) || store.state.roster[1];
+  const daysMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayKey = daysMap[new Date().getDay()];
+  const todayRoster = (store.state.roster || []).find(r => r.day === todayKey) || (store.state.roster || [])[0] || { label: "Имрӯз", supervisors: [] };
+  const todaySups = (todayRoster.supervisors && todayRoster.supervisors.length > 0)
+    ? todayRoster.supervisors
+    : (todayRoster.supervisorName ? [{ name: todayRoster.supervisorName, phone: todayRoster.phone, role: "Навбатдори асосӣ" }] : []);
   const canAddStudent = store.canManageStudents();
 
   return `
@@ -14,8 +19,12 @@ export function renderDashboard() {
         <div style="display:flex; align-items:center; gap:12px;">
           <span style="font-size:24px;">🔔</span>
           <div>
-            <div style="font-weight:800; font-size:14px; color:var(--emerald-900);">${t('roster_alert_active')}</div>
-            <div style="font-size:12px; color:var(--emerald-700);">Мураббии навбатдори имрӯза: <b>${todayRoster.supervisorName}</b> (${todayRoster.phone})</div>
+            <div style="font-weight:800; font-size:14px; color:var(--emerald-900);">${t('roster_alert_active')} (${todayRoster.label || 'Имрӯз'})</div>
+            <div style="font-size:12px; color:var(--emerald-700);">
+              ${todaySups.length > 0 
+                ? `Мураббиёни навбатдори имрӯза (${todaySups.length} нафар): <b>${todaySups.map(s => s.name).join(' • ')}</b>` 
+                : 'Навбатдорони имрӯза ҳанӯз таъин нашудаанд'}
+            </div>
           </div>
         </div>
         <button class="btn btn-sm btn-primary" onclick="window.khobgoh.navigate('roster')">
@@ -96,17 +105,37 @@ export function renderDashboard() {
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h3 style="margin:0; font-size:16px; font-weight:700;">⭐️ ${t('dash_supervisor_on_duty')}</h3>
-            <span class="status-pill status-active">${todayRoster.label}</span>
+            <span class="status-pill status-active">${todayRoster.label || 'Имрӯз'}</span>
           </div>
-          <div style="display:flex; align-items:center; gap:16px; padding:16px; background:var(--surface-muted); border-radius:var(--radius-md); margin-bottom:16px;">
-            <div style="width:50px; height:50px; border-radius:50%; background:var(--emerald-600); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px;">
-              ${(todayRoster?.supervisorName || 'Мураббӣ').split(' ')[0][0] || 'М'}
+
+          ${todaySups.length > 0 ? `
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+              ${todaySups.map(sup => `
+                <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface-muted); border-radius:var(--radius-md);">
+                  <div style="width:38px; height:38px; border-radius:50%; background:var(--emerald-600); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0;">
+                    ${(sup.name || 'М')[0]}
+                  </div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:14px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                      ${sup.name}
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between;">
+                      <span>${sup.role || 'Навбатдор'}</span>
+                      <span style="font-family:var(--font-mono);">${sup.phone || ''}</span>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
             </div>
-            <div>
-              <div style="font-weight:700; font-size:16px;">${todayRoster?.supervisorName || 'Мураббӣ'}</div>
-              <div style="font-size:13px; color:var(--text-muted);">${todayRoster?.phone || '—'}</div>
+          ` : `
+            <div style="padding:16px; background:var(--surface-muted); border-radius:var(--radius-md); text-align:center; margin-bottom:16px;">
+              <div style="font-size:24px; margin-bottom:4px;">👥</div>
+              <div style="font-size:13px; color:var(--text-muted);">Навбатдорони имрӯза ҳанӯз таъин нашудаанд.</div>
+              <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.navigate('roster')" style="margin-top:8px;">
+                Ба бахши навбатдорӣ ➔
+              </button>
             </div>
-          </div>
+          `}
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <div style="padding:12px; background:var(--surface-muted); border-radius:var(--radius-sm); text-align:center; cursor:pointer;" onclick="window.khobgoh.navigate('tea')" title="Кушодани ҷадвали чойнӯшӣ">
@@ -148,37 +177,89 @@ export function renderDashboard() {
 
       </div>
 
-      <!-- Quick Room Availability Strip -->
+      <!-- Quick Room Availability Strip: Separated Student & Supervisor Rooms (Requirement 2) -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
           <div>
             <h3 style="margin:0; font-size:16px; font-weight:700;">🛏️ Вазъияти ҷойгиршавӣ дар ҳуҷраҳо</h3>
-            <p style="margin:2px 0 0 0; font-size:13px; color:var(--text-muted);">Барои дидани ҷойҳо ва таъин кардани сардори ҳуҷра клик кунед</p>
+            <p style="margin:2px 0 0 0; font-size:13px; color:var(--text-muted);">Ҷойгиршавии алоҳидаи талабагон ва мураббиён дар хобгоҳ</p>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.navigate('rooms')">${t('rooms_title')}</button>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px;">
-          ${store.state.rooms.map(room => {
-            const occupied = store.state.students.filter(s => s.room === room.id && s.status === 'Active').length;
-            const isFull = occupied >= room.capacity;
-            const leaderId = store.state.roomLeaders[room.id];
-            const leader = store.state.students.find(s => s.id === leaderId);
+        <!-- Section 1: Student Rooms -->
+        <div style="margin-bottom:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+            <h4 style="margin:0; font-size:14px; font-weight:700; color:var(--emerald-800); display:flex; align-items:center; gap:6px;">
+              <span>👨‍🎓 Ҳуҷраҳои талабагон</span>
+              <span class="status-pill status-active" style="font-size:11px;">${store.state.rooms.filter(r => r.type === 'student').length} ҳуҷра</span>
+            </h4>
+            <span style="font-size:12px; color:var(--text-muted);">${stats.occupiedBeds} ҷойи банд • ${stats.vacantBeds} ҷойи холӣ</span>
+          </div>
 
-            return `
-              <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:${isFull ? 'var(--surface-muted)' : 'var(--surface)'}; text-align:center; transition:transform 0.1s ease;">
-                <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${room.name}</div>
-                <div style="font-size:12px; font-weight:600; color:${isFull ? '#ef4444' : '#10b981'}; margin-bottom:4px;">
-                  ${occupied} / ${room.capacity} ${t('rooms_bed')}
-                </div>
-                ${leader ? `
-                  <div style="font-size:10px; color:var(--amber-500); font-weight:700; background:rgba(245, 158, 11, 0.1); padding:2px 4px; border-radius:4px;">
-                    👑 ${leader.name.split(' ')[0]}
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(135px, 1fr)); gap:10px;">
+            ${store.state.rooms.filter(r => r.type === 'student').map(room => {
+              const occupied = store.state.students.filter(s => s.room === room.id && s.status === 'Active').length;
+              const isFull = occupied >= room.capacity;
+              const leaderId = store.state.roomLeaders ? store.state.roomLeaders[room.id] : null;
+              const leader = store.state.students.find(s => s.id === leaderId);
+              const supInCharge = (store.state.supervisors || []).find(s => s.id === room.supervisorId);
+
+              return `
+                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); background:${isFull ? 'var(--surface-muted)' : 'var(--surface)'}; text-align:center; transition:transform 0.1s ease;">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${room.name}</div>
+                  <div style="font-size:12px; font-weight:600; color:${isFull ? '#ef4444' : '#10b981'}; margin-bottom:4px;">
+                    ${occupied} / ${room.capacity} ҷой
                   </div>
-                ` : ''}
-              </div>
-            `;
-          }).join('')}
+                  ${leader ? `
+                    <div style="font-size:10px; color:var(--amber-600); font-weight:700; background:rgba(245, 158, 11, 0.1); padding:2px 4px; border-radius:4px; margin-bottom:2px;" title="Сардори ҳуҷра: ${leader.name}">
+                      👑 ${(leader.name || '').split(' ')[0]}
+                    </div>
+                  ` : ''}
+                  ${supInCharge ? `
+                    <div style="font-size:9px; color:var(--indigo-700); font-weight:600; background:rgba(99, 102, 241, 0.1); padding:1px 4px; border-radius:4px;" title="Мураббии масъул: ${supInCharge.name}">
+                      👔 ${(supInCharge.name || '').split(' ')[0]}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Section 2: Supervisor Rooms (Alohida / Separated) -->
+        <div style="border-top:1px dashed var(--border); padding-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+            <h4 style="margin:0; font-size:14px; font-weight:700; color:var(--indigo-700); display:flex; align-items:center; gap:6px;">
+              <span>👔 Ҳуҷраҳои мураббиён</span>
+              <span class="status-pill status-permission" style="font-size:11px;">${store.state.rooms.filter(r => r.type === 'supervisor').length} ҳуҷра</span>
+            </h4>
+            <span style="font-size:12px; color:var(--text-muted);">Барои истиқомати мураббиёни хобгоҳ</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(135px, 1fr)); gap:10px;">
+            ${store.state.rooms.filter(r => r.type === 'supervisor').map(room => {
+              const roomSups = (store.state.supervisors || []).filter(s => s.room === room.id);
+              const leaderId = store.state.roomLeaders ? store.state.roomLeaders[room.id] : null;
+              const leader = (store.state.supervisors || []).find(s => s.id === leaderId);
+
+              return `
+                <div onclick="window.khobgoh.navigate('rooms')" style="cursor:pointer; padding:12px; border:1px solid #c7d2fe; border-left:3px solid var(--indigo-500); border-radius:var(--radius-md); background:#f8fafc; text-align:center;">
+                  <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${room.name || 'Мураббиён ' + room.id}</div>
+                  <div style="font-size:12px; font-weight:600; color:var(--indigo-700); margin-bottom:4px;">
+                    ${roomSups.length} / ${room.capacity || 4} мураббӣ
+                  </div>
+                  ${leader ? `
+                    <div style="font-size:10px; color:#b45309; font-weight:700; background:rgba(245, 158, 11, 0.12); padding:2px 4px; border-radius:4px;" title="Сардори ҳуҷраи мураббиён: ${leader.name}">
+                      👑 ${(leader.name || '').split(' ')[0]}
+                    </div>
+                  ` : `
+                    <div style="font-size:9px; color:var(--text-muted);">Бе сардор</div>
+                  `}
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       </div>
 

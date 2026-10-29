@@ -9,6 +9,22 @@ class SyncManager {
     this.isOnline = navigator.onLine;
     this.isReady = false;
 
+    // Restore cached session immediately on startup (Requirement 10: Persistent Login)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const cached = localStorage.getItem("khobgoh_auth_session");
+        if (cached) {
+          const session = JSON.parse(cached);
+          if (session && session.email && (session.uid || session.id)) {
+            this.currentUser = { email: session.email, uid: session.uid || session.id };
+            this.userProfile = session;
+          }
+        }
+      }
+    } catch (e) {
+      console.debug("Session restore:", e);
+    }
+
     window.addEventListener("online", () => {
       this.isOnline = true;
       if (window.khobgoh?.showToast) window.khobgoh.showToast("Пайвасти интернет барқарор шуд.", "info");
@@ -22,6 +38,11 @@ class SyncManager {
 
   async init(store) {
     this.store = store;
+
+    if (this.userProfile && this.userProfile.role) {
+      this.store.state.activeRole = this.userProfile.role;
+      this.store.state.currentUserEmail = this.userProfile.email;
+    }
 
     try {
       this.fb = await import("./firebase.js");
@@ -38,28 +59,37 @@ class SyncManager {
             const userDoc = await this.fb.getDoc(this.fb.doc(this.fb.db, "users", user.uid));
             if (userDoc.exists()) {
               const data = userDoc.data();
-              this.userProfile = { id: user.uid, ...data };
+              this.userProfile = { id: user.uid, uid: user.uid, ...data };
               this.store.state.profile = this.userProfile;
               if (data.role) {
                 this.store.setRole(data.role);
               }
             } else {
-              this.userProfile = { id: user.uid, email: user.email, role: this.store.state.activeRole || "manager" };
+              this.userProfile = { id: user.uid, uid: user.uid, email: user.email, role: this.store.state.activeRole || "manager" };
             }
           } catch (e) {
             console.debug("User doc fetch info:", e);
           }
+
+          // Cache session for persistent login
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem("khobgoh_auth_session", JSON.stringify(this.userProfile));
+            }
+          } catch (e) {}
 
           this.subscribeCollections();
           if (window.khobgoh?.showToast) {
             window.khobgoh.showToast(`Пайваст бо абр: ${user.email}`, "success");
           }
         } else {
-          this.currentUser = null;
-          this.userProfile = null;
-          this.store.state.currentUserEmail = null;
-          this.store.state.isFirebaseConnected = false;
-          this.unsubscribeCollections();
+          // If no active auth but user previously logged in and hasn't logged out explicitly, preserve cached session
+          if (!this.userProfile) {
+            this.currentUser = null;
+            this.store.state.currentUserEmail = null;
+            this.store.state.isFirebaseConnected = false;
+            this.unsubscribeCollections();
+          }
         }
         this.store.notify();
       });
@@ -271,6 +301,15 @@ class SyncManager {
     }
   }
 
+  async deleteViolation(id) {
+    if (!this.fb || !this.currentUser) return;
+    try {
+      await this.fb.deleteDoc(this.fb.doc(this.fb.db, "violations", id));
+    } catch (e) {
+      console.warn("deleteViolation cloud write:", e);
+    }
+  }
+
   async syncCleanliness(item) {
     if (!this.fb || !this.currentUser) return;
     try {
@@ -281,6 +320,18 @@ class SyncManager {
       }, { merge: true });
     } catch (e) {
       console.warn("syncCleanliness cloud write:", e);
+    }
+  }
+
+  async syncRoster(roster) {
+    if (!this.fb || !this.currentUser) return;
+    try {
+      await this.fb.setDoc(this.fb.doc(this.fb.db, "settings", "roster"), {
+        items: roster,
+        updatedAt: this.fb.serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.warn("syncRoster cloud write:", e);
     }
   }
 
@@ -336,6 +387,18 @@ class SyncManager {
   }
 
   async logout() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem("khobgoh_auth_session");
+      }
+    } catch (e) {}
+    this.currentUser = null;
+    this.userProfile = null;
+    if (this.store) {
+      this.store.state.currentUserEmail = null;
+      this.store.state.isFirebaseConnected = false;
+      this.store.notify();
+    }
     if (this.fb) {
       return await this.fb.signOut(this.fb.auth);
     }

@@ -3,7 +3,7 @@ import { initialData } from "./data.js";
 import { translations } from "./translations.js";
 import { syncManager } from "./sync.js";
 
-const STORAGE_KEY = "khobgoh_state_v3_2";
+const STORAGE_KEY = "khobgoh_state_v3_3";
 
 class Store {
   constructor() {
@@ -98,10 +98,26 @@ class Store {
   }
 
   canRateCleanliness() {
-    if (this.state.activeRole === "manager" || this.state.activeRole === "head") return true;
-    if (this.state.activeRole === "supervisor") {
+    const inspectorId = this.state.cleanlinessInspectorId;
+    // Condition 1: Must have an assigned cleanliness inspector (Requirement 4)
+    if (!inspectorId) return false;
+
+    // Admin / Manager can rate/assist
+    if (this.state.activeRole === "manager") return true;
+
+    // Check if logged-in supervisor is the appointed inspector
+    if (syncManager.currentUser?.email) {
+      const inspector = (this.state.supervisors || []).find(s => s.id === inspectorId);
+      if (inspector && inspector.email && inspector.email.toLowerCase() === syncManager.currentUser.email.toLowerCase()) {
+        return true;
+      }
+    }
+
+    if (this.state.currentSupervisorId && this.state.currentSupervisorId === inspectorId) {
       return true;
     }
+
+    // Other supervisors cannot grade
     return false;
   }
 
@@ -460,6 +476,26 @@ class Store {
     syncManager.syncAttendance(date, studentId, status);
   }
 
+  // --- Duty Roster (2-3 Supervisors appointed by Head Supervisor - Requirement 6) ---
+  setDayRoster(dayKey, supervisorIds) {
+    const dayItem = this.state.roster.find(r => r.day === dayKey);
+    if (!dayItem) return;
+
+    const ids = Array.isArray(supervisorIds) ? supervisorIds : [supervisorIds];
+    const sups = (this.state.supervisors || []).filter(s => ids.includes(s.id));
+    
+    dayItem.supervisors = sups.slice(0, 3).map((s, idx) => ({
+      id: s.id,
+      name: s.name,
+      phone: s.phone || "",
+      order: idx + 1,
+      role: idx === 0 ? "Навбатдори асосӣ" : `Навбатдори №${idx + 1}`
+    }));
+
+    this.saveState();
+    syncManager.syncRoster(this.state.roster);
+  }
+
   markAllPresent(date) {
     if (!this.state.attendance[date]) {
       this.state.attendance[date] = {};
@@ -494,48 +530,69 @@ class Store {
     syncManager.syncViolation({ id }, true);
   }
 
-  // --- Cleanliness 5 criteria (Max 50 points) ---
-  rateRoom5(room, appearance, wardrobes, beds, dust, air, notes) {
+  deleteViolation(id) {
+    this.state.violations = this.state.violations.filter(v => v.id !== id);
+    this.saveState();
+    syncManager.deleteViolation(id);
+  }
+
+  // --- Cleanliness 5 criteria (Max 50 points) with Date History (Requirement 5) ---
+  rateRoom5(room, appearance, wardrobes, beds, dust, air, notes, date = null) {
     const a = Math.min(15, Math.max(0, parseFloat(appearance) || 0));
     const w = Math.min(10, Math.max(0, parseFloat(wardrobes) || 0));
     const b = Math.min(10, Math.max(0, parseFloat(beds) || 0));
     const d = Math.min(10, Math.max(0, parseFloat(dust) || 0));
     const ar = Math.min(5, Math.max(0, parseFloat(air) || 0));
     const total = parseFloat((a + w + b + d + ar).toFixed(1));
+    const ratingDate = date || this.selectedCleanlinessDate || new Date().toISOString().split("T")[0];
 
-    const existingIndex = this.state.cleanliness.findIndex(c => c.room === room);
+    const inspector = (this.state.supervisors || []).find(s => s.id === this.state.cleanlinessInspectorId);
+    const inspectorName = inspector ? inspector.name : "Масъули тозагӣ";
+
     const entry = {
+      id: `clean_${room}_${ratingDate}`,
       room,
+      date: ratingDate,
       score: total,
       appearance: a,
       wardrobes: w,
       beds: b,
       dust: d,
       air: ar,
-      notes: notes || "Санҷиш гузаронида шуд"
+      notes: notes || "Санҷиш гузаронида шуд",
+      inspectorId: this.state.cleanlinessInspectorId || null,
+      inspectorName
     };
 
+    const existingIndex = this.state.cleanliness.findIndex(c => c.room === room && (c.date === ratingDate || !c.date));
     if (existingIndex >= 0) {
       this.state.cleanliness[existingIndex] = entry;
     } else {
-      this.state.cleanliness.push(entry);
+      this.state.cleanliness.unshift(entry);
     }
 
-    // Re-rank
-    this.state.cleanliness.sort((x, y) => y.score - x.score);
-    this.state.cleanliness.forEach((item, idx) => {
-      item.rank = idx + 1;
-    });
     this.saveState();
     syncManager.syncCleanliness(entry);
   }
 
-  // --- Quick Stats helper ---
+  getCleanlinessForDate(date) {
+    const today = new Date().toISOString().split("T")[0];
+    const targetDate = date || this.selectedCleanlinessDate || today;
+    const list = this.state.cleanliness.filter(c => c.date === targetDate);
+    if (list.length > 0) {
+      return [...list].sort((a, b) => b.score - a.score);
+    }
+    // If no records for selected date yet, return all rooms with 0 or last recorded
+    return [...this.state.cleanliness].filter(c => !c.date || c.date === today).sort((a, b) => b.score - a.score);
+  }
+
+  // --- Quick Stats helper (Excludes supervisor quarters from vacant bed counts) ---
   getStats() {
     const totalStudents = this.state.students.length;
+    const studentRooms = this.state.rooms.filter(r => r.type === "student");
     let totalCapacity = 0;
-    this.state.rooms.forEach(r => {
-      totalCapacity += r.capacity;
+    studentRooms.forEach(r => {
+      totalCapacity += Number(r.capacity || 0);
     });
     const occupiedBeds = this.state.students.filter(s => s.status === "Active").length;
     const vacantBeds = Math.max(0, totalCapacity - occupiedBeds);

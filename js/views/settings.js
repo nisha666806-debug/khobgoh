@@ -13,24 +13,24 @@ export function renderSettings() {
         <p style="margin:0; color:var(--text-muted); font-size:14px;">${t('settings_subtitle')}</p>
       </div>
 
-      <!-- Role Simulator -->
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 8px 0; font-size:16px; font-weight:700;">🎭 ${t('settings_active_role')}</h3>
-        <p style="margin:0 0 14px 0; font-size:13px; color:var(--text-muted);">Барои санҷиши сатҳи дастрасӣ ва имкониятҳои ҳар як корбар нақшро иваз кунед:</p>
+      <!-- Official User Profile & Role (Requirement 7: Security - No Arbitrary Switching) -->
+      <div class="card" style="margin-bottom:20px; border-left:4px solid var(--emerald-600);">
+        <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:700;">👤 Ҳисоб ва вазифаи расмии корманд</h3>
+        <p style="margin:0 0 14px 0; font-size:13px; color:var(--text-muted);">
+          Вазифаи ҳар як корманд аз рӯи бақайдгирии расмии ӯ муайян карда мешавад ва худсарона иваз карда намешавад.
+        </p>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">
-          <button class="btn ${state.activeRole === 'manager' ? 'btn-primary' : 'btn-outline'}" onclick="window.khobgoh.changeRole('manager')">
-            💼 ${t('role_manager')}
-          </button>
-          <button class="btn ${state.activeRole === 'head' ? 'btn-primary' : 'btn-outline'}" onclick="window.khobgoh.changeRole('head')">
-            🎖️ ${t('role_head')}
-          </button>
-          <button class="btn ${state.activeRole === 'supervisor' ? 'btn-primary' : 'btn-outline'}" onclick="window.khobgoh.changeRole('supervisor')">
-            👥 ${t('role_supervisor')}
-          </button>
-          <button class="btn ${state.activeRole === 'student' ? 'btn-primary' : 'btn-outline'}" onclick="window.khobgoh.changeRole('student')">
-            👨‍🎓 ${t('role_student')}
-          </button>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface-muted); border-radius:var(--radius-md); flex-wrap:wrap; gap:10px;">
+          <div>
+            <div style="font-size:12px; color:var(--text-muted);">Вазифаи тасдиқшудаи шумо:</div>
+            <div style="font-size:16px; font-weight:800; color:var(--emerald-800); margin-top:2px; display:flex; align-items:center; gap:6px;">
+              <span>${state.activeRole === 'manager' ? '💼 Мудир (Админ)' : state.activeRole === 'head' ? '👑 Сармураббӣ' : '👔 Мураббӣ'}</span>
+              <span class="status-pill status-active" style="font-size:10px;">Фаъол</span>
+            </div>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); max-width:280px; line-height:1.4;">
+            🔒 Иваз кардани вазифаи мураббиён танҳо дар бахши расмии <b>«Мураббиён»</b> аз ҷониби Мудир ва Сармураббӣ иҷро карда мешавад.
+          </div>
         </div>
       </div>
 

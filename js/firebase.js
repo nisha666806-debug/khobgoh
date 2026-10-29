@@ -4,6 +4,8 @@ import {
 
 import {
   getAuth,
+  setPersistence,
+  browserLocalPersistence,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -42,6 +44,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+try {
+  setPersistence(auth, browserLocalPersistence);
+} catch (e) {
+  console.debug("Auth persistence setup:", e);
+}
 const db = getFirestore(app);
 
 const secondaryApp = initializeApp(firebaseConfig, "SupervisorRegistrationApp");

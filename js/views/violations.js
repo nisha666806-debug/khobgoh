@@ -57,11 +57,16 @@ export function renderViolations() {
                     </span>
                   </td>
                   <td style="text-align:right;">
-                    ${!isResolved ? `
-                      <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.resolveViolation('${v.id}')">
-                        ✓ Ҳал шуд
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                      ${!isResolved ? `
+                        <button class="btn btn-secondary btn-sm" onclick="window.khobgoh.resolveViolation('${v.id}')" title="Ҳал шуд">
+                          ✓ Ҳал шуд
+                        </button>
+                      ` : `<span style="font-size:12px; color:var(--text-muted); padding-right:4px;">Пӯшида шуд</span>`}
+                      <button class="btn btn-danger btn-sm" onclick="window.khobgoh.deleteViolation('${v.id}')" title="Нест кардан (Удалить)" style="padding:4px 8px;">
+                        🗑️
                       </button>
-                    ` : `<span style="font-size:12px; color:var(--text-muted);">Пӯшида шуд</span>`}
+                    </div>
                   </td>
                 </tr>
               `;
